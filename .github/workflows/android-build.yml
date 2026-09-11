@@ -13,9 +13,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      JAVA_HOME: /opt/jdk-21
       GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.workers.max=4 -Xmx4g"
-      ORG_GRADLE_PROJECT_warn: true
 
     steps:
       - name: Checkout
@@ -30,11 +28,21 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: |
-            platforms;android-36
-            platforms;android-35
-            build-tools;36.0.0
-            build-tools;35.0.0
+          accept-android-sdk-licenses: true
+
+      - name: Install Android SDK packages
+        run: |
+          set -e
+          echo "SDK_ROOT=$ANDROID_HOME"
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install \
+            "platforms;android-36" \
+            "platforms;android-35" \
+            "build-tools;36.0.0" \
+            "build-tools;35.0.0"
+          echo "Installed SDK packages:"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --list_installed || \
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --list | head -50
 
       - name: Cache Gradle
         uses: actions/cache@v4
