@@ -1,0 +1,6 @@
+{
+  "name": "Telegram",
+  "description": "High-performance, 60 FPS messaging app replicating the main chat list, starry night chat screen, and attachment panel.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
