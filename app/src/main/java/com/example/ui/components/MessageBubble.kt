@@ -261,9 +261,9 @@ private fun StandardTextBubble(
 ) {
     // Authentic Telegram bubble shape with iconic 20dp smooth curves and corner nip
     val bubbleShape = if (message.isOutgoing) {
-        RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 20.dp, bottomEnd = 4.dp)
+        RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp, bottomStart = 28.dp, bottomEnd = 6.dp)
     } else {
-        RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 4.dp, bottomEnd = 20.dp)
+        RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp, bottomStart = 6.dp, bottomEnd = 28.dp)
     }
 
     val gradient = if (message.isOutgoing) TelegramOutgoingGradient else TelegramIncomingGradient
@@ -350,9 +350,9 @@ private fun PhotoBubble(
 ) {
     val resolvedMedia = ApiClient.resolveUrl(message.mediaUrl.orEmpty())
     val bubbleShape = if (message.isOutgoing) {
-        RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 20.dp, bottomEnd = 5.dp)
+        RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp, bottomStart = 28.dp, bottomEnd = 6.dp)
     } else {
-        RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 5.dp, bottomEnd = 20.dp)
+        RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp, bottomStart = 6.dp, bottomEnd = 28.dp)
     }
 
     val gradient = if (message.isOutgoing) TelegramOutgoingGradient else TelegramIncomingGradient
@@ -440,9 +440,9 @@ private fun VideoBubble(
     onReactionClick: (() -> Unit)? = null
 ) {
     val bubbleShape = if (message.isOutgoing) {
-        RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 20.dp, bottomEnd = 5.dp)
+        RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp, bottomStart = 28.dp, bottomEnd = 6.dp)
     } else {
-        RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 5.dp, bottomEnd = 20.dp)
+        RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp, bottomStart = 6.dp, bottomEnd = 28.dp)
     }
 
     Column(horizontalAlignment = if (message.isOutgoing) Alignment.End else Alignment.Start) {
@@ -568,9 +568,9 @@ private fun AudioMessageBubble(
     onReactionClick: (() -> Unit)? = null
 ) {
     val bubbleShape = if (message.isOutgoing) {
-        RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 20.dp, bottomEnd = 5.dp)
+        RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp, bottomStart = 28.dp, bottomEnd = 6.dp)
     } else {
-        RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 5.dp, bottomEnd = 20.dp)
+        RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp, bottomStart = 6.dp, bottomEnd = 28.dp)
     }
 
     val gradient = if (message.isOutgoing) TelegramOutgoingGradient else TelegramIncomingGradient
@@ -825,7 +825,7 @@ fun ImageCollageView(
     onLongClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val bubbleShape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 20.dp, bottomEnd = 5.dp)
+    val bubbleShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp, bottomStart = 28.dp, bottomEnd = 6.dp)
 
     Box(
         modifier = modifier
@@ -880,9 +880,9 @@ private fun LocationBubble(
     onReactionClick: (() -> Unit)? = null
 ) {
     val bubbleShape = if (message.isOutgoing) {
-        RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 20.dp, bottomEnd = 4.dp)
+        RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp, bottomStart = 28.dp, bottomEnd = 6.dp)
     } else {
-        RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 4.dp, bottomEnd = 20.dp)
+        RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp, bottomStart = 6.dp, bottomEnd = 28.dp)
     }
 
     val gradient = if (message.isOutgoing) TelegramOutgoingGradient else TelegramIncomingGradient
@@ -967,9 +967,9 @@ private fun PollBubble(
     onReactionClick: (() -> Unit)? = null
 ) {
     val bubbleShape = if (message.isOutgoing) {
-        RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 20.dp, bottomEnd = 4.dp)
+        RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp, bottomStart = 28.dp, bottomEnd = 6.dp)
     } else {
-        RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 4.dp, bottomEnd = 20.dp)
+        RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp, bottomStart = 6.dp, bottomEnd = 28.dp)
     }
 
     val gradient = if (message.isOutgoing) TelegramOutgoingGradient else TelegramIncomingGradient
@@ -1088,9 +1088,9 @@ private fun FileBubble(
     onReactionClick: (() -> Unit)? = null
 ) {
     val bubbleShape = if (message.isOutgoing) {
-        RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 20.dp, bottomEnd = 4.dp)
+        RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp, bottomStart = 28.dp, bottomEnd = 6.dp)
     } else {
-        RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 4.dp, bottomEnd = 20.dp)
+        RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp, bottomStart = 6.dp, bottomEnd = 28.dp)
     }
 
     val gradient = if (message.isOutgoing) TelegramOutgoingGradient else TelegramIncomingGradient

@@ -74,6 +74,9 @@ interface ApiService {
     @GET("auth/blocked/users")
     suspend fun getBlockedUsers(): Response<List<ApiUser>>
 
+    @GET("auth/sessions")
+    suspend fun getSessions(): Response<List<ApiSession>>
+
     @POST("auth/block")
     suspend fun blockUser(
         @Body body: Map<String, String>

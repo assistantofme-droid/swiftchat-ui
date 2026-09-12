@@ -1,0 +1,490 @@
+package com.example.ui.screens
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Devices
+import androidx.compose.material.icons.filled.Forum
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.ui.theme.TelegramChatListBg
+import com.example.ui.theme.TelegramPrimary
+import com.example.ui.theme.TelegramSurface
+import com.example.ui.theme.TelegramTextMuted
+import com.example.ui.theme.TelegramTextPrimary
+import com.example.ui.theme.TelegramTextSecondary
+
+/** Privacy options: "Everyone" | "Contacts" | "Nobody" */
+private val PRIVACY_OPTIONS = listOf("Everyone", "Contacts", "Nobody")
+
+@Composable
+fun PrivacySettingsScreen(
+    privacyLastSeen: String,
+    privacyPhoneNumber: String,
+    privacyForwarded: String,
+    privacyGroups: String,
+    isPhoneHidden: Boolean,
+    onSetLastSeen: (String) -> Unit,
+    onSetPhone: (String) -> Unit,
+    onSetForwarded: (String) -> Unit,
+    onSetGroups: (String) -> Unit,
+    onSetPhoneHidden: (Boolean) -> Unit,
+    onBack: () -> Unit
+) {
+    var dialogField by remember { mutableStateOf<String?>(null) }
+
+    Scaffold(
+        containerColor = TelegramChatListBg,
+        topBar = {
+            SettingsTopBar(title = "Privacy & Security", onBack = onBack)
+        }
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 12.dp)
+        ) {
+            item {
+                SettingsCard {
+                    SectionHeader("Privacy")
+                    PrivacyRow(
+                        icon = Icons.Default.VisibilityOff,
+                        iconColor = Color(0xFF58D68D),
+                        title = "Last Seen & Online",
+                        value = privacyLastSeen,
+                        onClick = { dialogField = "lastSeen" }
+                    )
+                    PrivacyRow(
+                        icon = Icons.Default.Phone,
+                        iconColor = Color(0xFF5DADE2),
+                        title = "Phone Number",
+                        value = privacyPhoneNumber,
+                        onClick = { dialogField = "phone" }
+                    )
+                    PrivacyRow(
+                        icon = Icons.Default.Forum,
+                        iconColor = Color(0xFFF39C12),
+                        title = "Forwarded Messages",
+                        value = privacyForwarded,
+                        onClick = { dialogField = "forwarded" }
+                    )
+                    PrivacyRow(
+                        icon = Icons.Default.Person,
+                        iconColor = Color(0xFFBB8FCE),
+                        title = "Groups & Channels",
+                        value = privacyGroups,
+                        onClick = { dialogField = "groups" }
+                    )
+                }
+            }
+
+            item { Spacer(modifier = Modifier.height(12.dp)) }
+
+            item {
+                SettingsCard {
+                    SectionHeader("Security")
+                    ToggleRow(
+                        icon = Icons.Default.Lock,
+                        iconColor = Color(0xFFEC7063),
+                        title = "Hide My Phone Number",
+                        subtitle = "Other users won't see your phone on your profile",
+                        checked = isPhoneHidden,
+                        onCheckedChange = onSetPhoneHidden
+                    )
+                }
+            }
+
+            item { Spacer(modifier = Modifier.height(12.dp)) }
+
+            item {
+                SettingsCard {
+                    SectionHeader("Sessions")
+                    InfoRow(
+                        icon = Icons.Default.Devices,
+                        iconColor = Color(0xFF48C9B0),
+                        title = "Active Sessions",
+                        subtitle = "Manage devices logged into your account",
+                        onClick = { /* navigates to Devices screen via Settings */ }
+                    )
+                }
+            }
+
+            item { Spacer(modifier = Modifier.height(80.dp)) }
+        }
+    }
+
+    // Privacy option picker dialog
+    dialogField?.let { field ->
+        val current = when (field) {
+            "lastSeen" -> privacyLastSeen
+            "phone" -> privacyPhoneNumber
+            "forwarded" -> privacyForwarded
+            "groups" -> privacyGroups
+            else -> "Everyone"
+        }
+        val title = when (field) {
+            "lastSeen" -> "Last Seen & Online"
+            "phone" -> "Phone Number"
+            "forwarded" -> "Forwarded Messages"
+            "groups" -> "Groups & Channels"
+            else -> "Privacy"
+        }
+        AlertDialog(
+            onDismissRequest = { dialogField = null },
+            containerColor = TelegramSurface,
+            titleContentColor = TelegramTextPrimary,
+            title = { Text(title, color = TelegramTextPrimary) },
+            text = {
+                Column {
+                    PRIVACY_OPTIONS.forEach { option ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    when (field) {
+                                        "lastSeen" -> onSetLastSeen(option)
+                                        "phone" -> onSetPhone(option)
+                                        "forwarded" -> onSetForwarded(option)
+                                        "groups" -> onSetGroups(option)
+                                    }
+                                    dialogField = null
+                                }
+                                .padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = option,
+                                color = if (option == current) TelegramPrimary else TelegramTextPrimary,
+                                fontSize = 16.sp,
+                                fontWeight = if (option == current) FontWeight.SemiBold else FontWeight.Normal,
+                                modifier = Modifier.weight(1f)
+                            )
+                            if (option == current) {
+                                Icon(
+                                    imageVector = Icons.Default.Security,
+                                    contentDescription = null,
+                                    tint = TelegramPrimary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { dialogField = null }) {
+                    Text("Cancel", color = TelegramTextSecondary)
+                }
+            }
+        )
+    }
+}
+
+@Composable
+internal fun SettingsTopBar(title: String, onBack: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(TelegramChatListBg)
+            .statusBarsPadding()
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onBack) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
+                tint = TelegramTextPrimary
+            )
+        }
+        Text(
+            text = title,
+            color = TelegramTextPrimary,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(start = 8.dp)
+        )
+    }
+}
+
+@Composable
+internal fun SettingsCard(content: @Composable () -> Unit) {
+    Surface(
+        color = TelegramSurface,
+        shape = RoundedCornerShape(20.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp)
+    ) {
+        Column { content() }
+    }
+}
+
+@Composable
+internal fun SectionHeader(text: String) {
+    Text(
+        text = text,
+        color = TelegramPrimary,
+        fontSize = 14.sp,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(start = 16.dp, top = 14.dp, bottom = 6.dp)
+    )
+}
+
+@Composable
+internal fun PrivacyRow(
+    icon: ImageVector,
+    iconColor: Color,
+    title: String,
+    value: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(iconColor.copy(alpha = 0.18f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = iconColor,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+        Spacer(modifier = Modifier.size(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                color = TelegramTextPrimary,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
+        Text(
+            text = value,
+            color = TelegramTextSecondary,
+            fontSize = 14.sp
+        )
+    }
+}
+
+@Composable
+internal fun ToggleRow(
+    icon: ImageVector,
+    iconColor: Color,
+    title: String,
+    subtitle: String? = null,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(iconColor.copy(alpha = 0.18f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = iconColor,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+        Spacer(modifier = Modifier.size(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                color = TelegramTextPrimary,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium
+            )
+            if (!subtitle.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = subtitle,
+                    color = TelegramTextSecondary,
+                    fontSize = 13.sp
+                )
+            }
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange
+        )
+    }
+}
+
+@Composable
+internal fun InfoRow(
+    icon: ImageVector,
+    iconColor: Color,
+    title: String,
+    subtitle: String? = null,
+    value: String? = null,
+    onClick: (() -> Unit)? = null
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .let { if (onClick != null) it.clickable(onClick = onClick) else it }
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(iconColor.copy(alpha = 0.18f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = iconColor,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+        Spacer(modifier = Modifier.size(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                color = TelegramTextPrimary,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium
+            )
+            if (!subtitle.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = subtitle,
+                    color = TelegramTextSecondary,
+                    fontSize = 13.sp
+                )
+            }
+        }
+        if (!value.isNullOrBlank()) {
+            Text(
+                text = value,
+                color = TelegramPrimary,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
+
+/**
+ * Settings item row with chevron — used on the main Settings screen to
+ * navigate into a sub-screen.
+ */
+@Composable
+internal fun SettingsItem(
+    icon: ImageVector,
+    iconColor: Color,
+    title: String,
+    subtitle: String?,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(iconColor.copy(alpha = 0.18f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = iconColor,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+        Spacer(modifier = Modifier.size(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                color = TelegramTextPrimary,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium
+            )
+            if (!subtitle.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = subtitle,
+                    color = TelegramTextSecondary,
+                    fontSize = 13.sp
+                )
+            }
+        }
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = TelegramTextSecondary,
+            modifier = Modifier.size(20.dp)
+        )
+    }
+}

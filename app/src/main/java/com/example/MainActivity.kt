@@ -114,6 +114,19 @@ private fun TelegramAppContent(viewModel: ChatViewModel) {
                     onSendOtp = { phone -> viewModel.sendOtp(phone) },
                     onVerifyOtp = { phone, code -> viewModel.verifyOtp(phone, code) }
                 )
+            } else if (uiState.needsProfileSetup) {
+                // First-time users must complete their profile before using the app
+                com.example.ui.screens.SetupProfileScreen(
+                    initialName = uiState.meUser?.name,
+                    initialUsername = uiState.meUser?.username,
+                    initialAvatarUrl = uiState.currentUserAvatar,
+                    isLoading = uiState.isProfileSetupLoading,
+                    errorMessage = uiState.profileSetupError,
+                    prefillPhone = uiState.currentUserPhone,
+                    onSubmit = { name, username, avatarUri ->
+                        viewModel.submitProfileSetup(name, username, avatarUri)
+                    }
+                )
             } else {
                 AnimatedContent(
                     targetState = uiState.selectedChatId,
@@ -205,13 +218,113 @@ private fun TelegramAppContent(viewModel: ChatViewModel) {
                                 onSelectBottomNav = { viewModel.selectBottomNavIndex(it) },
                                 selectedBottomNavIndex = 1
                             )
-                            2 -> SettingsScreen(
-                                meUser = uiState.meUser,
-                                currentUserAvatarUrl = uiState.currentUserAvatar,
-                                selectedBottomNavIndex = 2,
-                                onSelectBottomNav = { viewModel.selectBottomNavIndex(it) },
-                                onLogout = { viewModel.logout() }
-                            )
+                            2 -> {
+                                val route = uiState.activeSettingsScreen
+                                when (route) {
+                                    com.example.ui.screens.SettingsRoute.PRIVACY ->
+                                        com.example.ui.screens.PrivacySettingsScreen(
+                                            privacyLastSeen = uiState.privacyLastSeen,
+                                            privacyPhoneNumber = uiState.privacyPhoneNumber,
+                                            privacyForwarded = uiState.privacyForwarded,
+                                            privacyGroups = uiState.privacyGroups,
+                                            isPhoneHidden = uiState.isPhoneHidden,
+                                            onSetLastSeen = { viewModel.setPrivacyLastSeen(it) },
+                                            onSetPhone = { viewModel.setPrivacyPhoneNumber(it) },
+                                            onSetForwarded = { viewModel.setPrivacyForwarded(it) },
+                                            onSetGroups = { viewModel.setPrivacyGroups(it) },
+                                            onSetPhoneHidden = { viewModel.setPhoneHidden(it) },
+                                            onBack = { viewModel.closeSettingsScreen() }
+                                        )
+                                    com.example.ui.screens.SettingsRoute.CHAT ->
+                                        com.example.ui.screens.ChatSettingsScreen(
+                                            messageTextSize = uiState.messageTextSize,
+                                            messageCornerRadius = uiState.messageCornerRadius,
+                                            doubleTapEmoji = uiState.doubleTapEmoji,
+                                            isDarkMode = uiState.isDarkMode,
+                                            onSetTextSize = { viewModel.setMessageTextSize(it) },
+                                            onSetCornerRadius = { viewModel.setMessageCornerRadius(it) },
+                                            onSetDoubleTapEmoji = { viewModel.setDoubleTapEmoji(it) },
+                                            onToggleDarkMode = { viewModel.toggleTheme() },
+                                            onBack = { viewModel.closeSettingsScreen() }
+                                        )
+                                    com.example.ui.screens.SettingsRoute.DATA ->
+                                        com.example.ui.screens.DataAndStorageScreen(
+                                            autoDownloadMobile = uiState.autoDownloadMobile,
+                                            autoDownloadWifi = uiState.autoDownloadWifi,
+                                            autoDownloadRoaming = uiState.autoDownloadRoaming,
+                                            saveGalleryPrivate = uiState.saveGalleryPrivate,
+                                            saveGalleryGroups = uiState.saveGalleryGroups,
+                                            saveGalleryChannels = uiState.saveGalleryChannels,
+                                            onSetAutoDlMobile = { viewModel.setAutoDownloadMobile(it) },
+                                            onSetAutoDlWifi = { viewModel.setAutoDownloadWifi(it) },
+                                            onSetAutoDlRoaming = { viewModel.setAutoDownloadRoaming(it) },
+                                            onSaveGalleryPrivate = { viewModel.setSaveGalleryPrivate(it) },
+                                            onSaveGalleryGroups = { viewModel.setSaveGalleryGroups(it) },
+                                            onSaveGalleryChannels = { viewModel.setSaveGalleryChannels(it) },
+                                            onClearCache = { viewModel.clearCache() },
+                                            onBack = { viewModel.closeSettingsScreen() }
+                                        )
+                                    com.example.ui.screens.SettingsRoute.FOLDERS ->
+                                        com.example.ui.screens.ChatFoldersScreen(
+                                            folders = uiState.chatFolders,
+                                            showFolderTags = uiState.showFolderTags,
+                                            onAddFolder = { viewModel.addChatFolder(it) },
+                                            onDeleteFolder = { viewModel.deleteChatFolder(it) },
+                                            onToggleFolderTags = { viewModel.setFolderTags(it) },
+                                            onBack = { viewModel.closeSettingsScreen() }
+                                        )
+                                    com.example.ui.screens.SettingsRoute.DEVICES ->
+                                        com.example.ui.screens.DevicesScreen(
+                                            sessions = uiState.sessions,
+                                            isLoading = uiState.isSessionsLoading,
+                                            errorMessage = uiState.sessionsError,
+                                            onLaunchLoad = { viewModel.loadSessions() },
+                                            onLogoutAllOthers = { viewModel.logoutAllOtherDevices() },
+                                            onBack = { viewModel.closeSettingsScreen() }
+                                        )
+                                    com.example.ui.screens.SettingsRoute.POWER ->
+                                        com.example.ui.screens.PowerSavingScreen(
+                                            powerSavingEnabled = uiState.powerSavingEnabled,
+                                            powerLowQuality = uiState.powerLowQuality,
+                                            powerDisableAnimations = uiState.powerDisableAnimations,
+                                            powerDisableAutoplay = uiState.powerDisableAutoplay,
+                                            onSetPowerSaving = { viewModel.setPowerSavingEnabled(it) },
+                                            onSetLowQuality = { viewModel.setPowerLowQuality(it) },
+                                            onSetDisableAnimations = { viewModel.setPowerDisableAnimations(it) },
+                                            onSetDisableAutoplay = { viewModel.setPowerDisableAutoplay(it) },
+                                            onBack = { viewModel.closeSettingsScreen() }
+                                        )
+                                    com.example.ui.screens.SettingsRoute.LANGUAGE ->
+                                        com.example.ui.screens.LanguageScreen(
+                                            selectedLanguage = uiState.language,
+                                            onSelectLanguage = { viewModel.setLanguage(it) },
+                                            onBack = { viewModel.closeSettingsScreen() }
+                                        )
+                                    com.example.ui.screens.SettingsRoute.FEATURES ->
+                                        com.example.ui.screens.SevenEve9FeaturesScreen(
+                                            smartRepliesEnabled = uiState.smartRepliesEnabled,
+                                            messageSummaryEnabled = uiState.messageSummaryEnabled,
+                                            autoTranslateEnabled = uiState.autoTranslateEnabled,
+                                            voiceToTextEnabled = uiState.voiceToTextEnabled,
+                                            smartSearchEnabled = uiState.smartSearchEnabled,
+                                            onSetSmartReplies = { viewModel.setSmartReplies(it) },
+                                            onSetMessageSummary = { viewModel.setMessageSummary(it) },
+                                            onSetAutoTranslate = { viewModel.setAutoTranslate(it) },
+                                            onSetVoiceToText = { viewModel.setVoiceToText(it) },
+                                            onSetSmartSearch = { viewModel.setSmartSearch(it) },
+                                            onBack = { viewModel.closeSettingsScreen() }
+                                        )
+                                    else -> com.example.ui.screens.SettingsScreen(
+                                        meUser = uiState.meUser,
+                                        currentUserAvatarUrl = uiState.currentUserAvatar,
+                                        selectedBottomNavIndex = 2,
+                                        onSelectBottomNav = { viewModel.selectBottomNavIndex(it) },
+                                        onLogout = { viewModel.logout() },
+                                        onOpenRoute = { viewModel.openSettingsScreen(it) },
+                                        onAskQuestion = { viewModel.openSupportChat() }
+                                    )
+                                }
+                            }
                             3 -> ProfileScreen(
                                 meUser = uiState.meUser,
                                 myChannel = uiState.myChannel,

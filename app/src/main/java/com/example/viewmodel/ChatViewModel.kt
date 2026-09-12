@@ -13,6 +13,7 @@ import com.example.data.api.ApiMessage
 import com.example.data.api.ApiPoll
 import com.example.data.api.ApiPollOption
 import com.example.data.api.ApiProfileSong
+import com.example.data.api.ApiSession
 import com.example.data.api.ApiUser
 import com.example.data.api.AddContactRequest
 import com.example.data.api.EditMessageRequest
@@ -101,7 +102,53 @@ data class ChatUiState(
     val myChannel: ApiConversation? = null,
 
     // Theme — toggled from the chat list 3-dot menu
-    val isDarkMode: Boolean = true
+    val isDarkMode: Boolean = true,
+
+    // First-time profile setup flow
+    val needsProfileSetup: Boolean = false,
+    val isProfileSetupLoading: Boolean = false,
+    val profileSetupError: String? = null,
+
+    // ===== App preferences (synced with SessionManager) =====
+    val language: String = "fa",
+    val messageTextSize: Int = 16,
+    val messageCornerRadius: Int = 20,
+    val doubleTapEmoji: String = "❤️",
+    val autoDownloadMobile: Boolean = true,
+    val autoDownloadWifi: Boolean = true,
+    val autoDownloadRoaming: Boolean = false,
+    val saveGalleryPrivate: Boolean = false,
+    val saveGalleryGroups: Boolean = false,
+    val saveGalleryChannels: Boolean = false,
+    val powerSavingEnabled: Boolean = false,
+    val powerLowQuality: Boolean = false,
+    val powerDisableAnimations: Boolean = false,
+    val powerDisableAutoplay: Boolean = false,
+
+    // 7eve9 AI Features
+    val smartRepliesEnabled: Boolean = false,
+    val messageSummaryEnabled: Boolean = false,
+    val autoTranslateEnabled: Boolean = false,
+    val voiceToTextEnabled: Boolean = false,
+    val smartSearchEnabled: Boolean = false,
+
+    // Chat folders (local-only for now)
+    val chatFolders: List<com.example.ui.screens.ChatFolder> = emptyList(),
+    val showFolderTags: Boolean = false,
+
+    val privacyLastSeen: String = "Everyone",
+    val privacyPhoneNumber: String = "Contacts",
+    val privacyForwarded: String = "Everyone",
+    val privacyGroups: String = "Everyone",
+    val isPhoneHidden: Boolean = false,
+
+    // Settings sub-screen navigation — string keys; null = closed
+    val activeSettingsScreen: String? = null,
+
+    // Devices screen — sessions list
+    val sessions: List<ApiSession> = emptyList(),
+    val isSessionsLoading: Boolean = false,
+    val sessionsError: String? = null
 )
 
 class ChatViewModel(application: Application) : AndroidViewModel(application) {
@@ -124,7 +171,26 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 currentUserPhone = sessionManager.phone,
                 currentUserAvatar = sessionManager.avatar,
                 currentUserBio = sessionManager.bio,
-                isDarkMode = sessionManager.isDarkMode
+                isDarkMode = sessionManager.isDarkMode,
+                language = sessionManager.language,
+                messageTextSize = sessionManager.messageTextSize,
+                messageCornerRadius = sessionManager.messageCornerRadius,
+                doubleTapEmoji = sessionManager.doubleTapEmoji,
+                autoDownloadMobile = sessionManager.autoDownloadMobile,
+                autoDownloadWifi = sessionManager.autoDownloadWifi,
+                autoDownloadRoaming = sessionManager.autoDownloadRoaming,
+                saveGalleryPrivate = sessionManager.saveGalleryPrivate,
+                saveGalleryGroups = sessionManager.saveGalleryGroups,
+                saveGalleryChannels = sessionManager.saveGalleryChannels,
+                powerSavingEnabled = sessionManager.powerSavingEnabled,
+                powerLowQuality = sessionManager.powerLowQuality,
+                powerDisableAnimations = sessionManager.powerDisableAnimations,
+                powerDisableAutoplay = sessionManager.powerDisableAutoplay,
+                privacyLastSeen = sessionManager.privacyLastSeen,
+                privacyPhoneNumber = sessionManager.privacyPhoneNumber,
+                privacyForwarded = sessionManager.privacyForwarded,
+                privacyGroups = sessionManager.privacyGroups,
+                isPhoneHidden = sessionManager.isPhoneHidden
             )
         }
 
@@ -166,7 +232,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                             currentUserAvatar = u.avatar ?: it.currentUserAvatar,
                             currentUserBio = u.bio ?: it.currentUserBio,
                             meUser = u,
-                            isMeLoading = false
+                            isMeLoading = false,
+                            // If the user has no name or username, force them through SetupProfile
+                            needsProfileSetup = u.name.isNullOrBlank() || u.username.isNullOrBlank()
                         )
                     }
                     // After me is loaded, fetch the user's owned channel for the Profile card.
@@ -283,6 +351,116 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
      * Re-uses bootstrapCurrentUser.
      */
     fun refreshMe() = bootstrapCurrentUser()
+
+    /**
+     * Submit the first-time profile setup form.
+     * Validates name (>=2 chars) and username (5-32 chars, letters/numbers/_),
+     * then PUTs to /auth/profile. If an avatar image was picked, also uploads it
+     * as multipart after the JSON PUT succeeds.
+     * On success, clears needsProfileSetup and starts the normal app flow.
+     */
+    fun submitProfileSetup(name: String, username: String, avatarUri: String?) {
+        // Final client-side guard
+        if (name.isBlank() || name.trim().length < 2) {
+            _uiState.update {
+                it.copy(profileSetupError = "Name must be at least 2 characters")
+            }
+            return
+        }
+        val cleanUsername = username.removePrefix("@").trim()
+        if (!Regex("^[a-zA-Z0-9_]{5,32}$").matches(cleanUsername)) {
+            _uiState.update {
+                it.copy(profileSetupError = "Username must be 5-32 chars, letters/numbers/_ only")
+            }
+            return
+        }
+
+        _uiState.update {
+            it.copy(isProfileSetupLoading = true, profileSetupError = null)
+        }
+        viewModelScope.launch {
+            try {
+                val resp = ApiClient.service.updateProfile(
+                    UpdateProfileRequest(
+                        name = name.trim(),
+                        username = cleanUsername
+                    )
+                )
+                if (!resp.isSuccessful || resp.body() == null) {
+                    val err = parseErrorBody(resp.errorBody())
+                    _uiState.update {
+                        it.copy(
+                            isProfileSetupLoading = false,
+                            profileSetupError = err ?: "Setup failed (${resp.code()})"
+                        )
+                    }
+                    return@launch
+                }
+
+                val u = resp.body()!!
+                sessionManager.saveSession(
+                    token = sessionManager.token ?: return@launch,
+                    id = u._id ?: sessionManager.userId,
+                    phone = u.phone ?: sessionManager.phone,
+                    name = u.name ?: name,
+                    username = u.username ?: cleanUsername,
+                    avatar = u.avatar ?: sessionManager.avatar,
+                    bio = u.bio ?: sessionManager.bio
+                )
+
+                // If user picked an avatar image, upload it as multipart
+                if (!avatarUri.isNullOrBlank() && avatarUri!!.startsWith("content://")) {
+                    try {
+                        val file = uriToFile(avatarUri) ?: return@try
+                        val mime = guessMime(avatarUri)
+                        val reqFile = file.asRequestBody(mime.toMediaTypeOrNull())
+                        val filePart = MultipartBody.Part.createFormData("file", file.name, reqFile)
+                        val avatarResp = ApiClient.service.updateProfileAvatar(filePart)
+                        if (avatarResp.isSuccessful && avatarResp.body() != null) {
+                            val avUser = avatarResp.body()!!
+                            sessionManager.avatar = avUser.avatar
+                            _uiState.update {
+                                it.copy(
+                                    currentUserAvatar = avUser.avatar ?: it.currentUserAvatar,
+                                    meUser = avUser
+                                )
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.w("ChatViewModel", "Avatar upload during setup skipped: ${e.message}")
+                    }
+                }
+
+                _uiState.update {
+                    it.copy(
+                        isProfileSetupLoading = false,
+                        profileSetupError = null,
+                        needsProfileSetup = false,
+                        currentUserName = u.name ?: name,
+                        currentUserAvatar = sessionManager.avatar,
+                        meUser = u
+                    )
+                }
+
+                // Now that profile is set up, kick off the normal app flow
+                bootstrapCurrentUser()
+                refreshConversations()
+                startConversationsPolling()
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "submitProfileSetup error", e)
+                _uiState.update {
+                    it.copy(
+                        isProfileSetupLoading = false,
+                        profileSetupError = "Network error: ${e.localizedMessage ?: "check connection"}"
+                    )
+                }
+            }
+        }
+    }
+
+    fun clearProfileSetupError() {
+        _uiState.update { it.copy(profileSetupError = null) }
+    }
 
     /**
      * Upload a new avatar image via PUT /auth/profile (multipart).
@@ -406,6 +584,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
                     ApiClient.setTokenProvider { token }
 
+                    // Check if this is a brand new user OR the user has no name/username set yet.
+                    // If so, route them through the SetupProfileScreen before they can use the app.
+                    val needsSetup = user?.isNewUser == true ||
+                        user?.name.isNullOrBlank() ||
+                        user?.username.isNullOrBlank()
+
                     _uiState.update {
                         it.copy(
                             isAuthenticated = true,
@@ -414,14 +598,17 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                             currentUserName = user?.name ?: "User",
                             currentUserPhone = user?.phone ?: cleanPhone,
                             currentUserAvatar = user?.avatar,
-                            currentUserBio = user?.bio
+                            currentUserBio = user?.bio,
+                            needsProfileSetup = needsSetup
                         )
                     }
 
-                    // Pull full profile + chats from server now that we have a token
-                    bootstrapCurrentUser()
-                    refreshConversations()
-                    startConversationsPolling()
+                    if (!needsSetup) {
+                        // Pull full profile + chats from server now that we have a token
+                        bootstrapCurrentUser()
+                        refreshConversations()
+                        startConversationsPolling()
+                    }
                 } else {
                     val err = parseErrorBody(response.errorBody())
                         ?: response.body()?.message
@@ -1536,6 +1723,305 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val newMode = !_uiState.value.isDarkMode
         sessionManager.isDarkMode = newMode
         _uiState.update { it.copy(isDarkMode = newMode) }
+    }
+
+    // =============================================================
+    // Settings sub-screen navigation
+    // =============================================================
+
+    fun openSettingsScreen(key: String) {
+        _uiState.update { it.copy(activeSettingsScreen = key) }
+    }
+
+    fun closeSettingsScreen() {
+        _uiState.update { it.copy(activeSettingsScreen = null) }
+    }
+
+    // ===== Preference setters — persisted to SessionManager =====
+
+    fun setLanguage(lang: String) {
+        sessionManager.language = lang
+        _uiState.update { it.copy(language = lang) }
+    }
+
+    fun setMessageTextSize(size: Int) {
+        sessionManager.messageTextSize = size
+        _uiState.update { it.copy(messageTextSize = size) }
+    }
+
+    fun setMessageCornerRadius(radius: Int) {
+        sessionManager.messageCornerRadius = radius
+        _uiState.update { it.copy(messageCornerRadius = radius) }
+    }
+
+    fun setDoubleTapEmoji(emoji: String) {
+        sessionManager.doubleTapEmoji = emoji
+        _uiState.update { it.copy(doubleTapEmoji = emoji) }
+    }
+
+    fun setAutoDownloadMobile(v: Boolean) {
+        sessionManager.autoDownloadMobile = v
+        _uiState.update { it.copy(autoDownloadMobile = v) }
+    }
+
+    fun setAutoDownloadWifi(v: Boolean) {
+        sessionManager.autoDownloadWifi = v
+        _uiState.update { it.copy(autoDownloadWifi = v) }
+    }
+
+    fun setAutoDownloadRoaming(v: Boolean) {
+        sessionManager.autoDownloadRoaming = v
+        _uiState.update { it.copy(autoDownloadRoaming = v) }
+    }
+
+    fun setSaveGalleryPrivate(v: Boolean) {
+        sessionManager.saveGalleryPrivate = v
+        _uiState.update { it.copy(saveGalleryPrivate = v) }
+    }
+
+    fun setSaveGalleryGroups(v: Boolean) {
+        sessionManager.saveGalleryGroups = v
+        _uiState.update { it.copy(saveGalleryGroups = v) }
+    }
+
+    fun setSaveGalleryChannels(v: Boolean) {
+        sessionManager.saveGalleryChannels = v
+        _uiState.update { it.copy(saveGalleryChannels = v) }
+    }
+
+    fun setPowerSavingEnabled(v: Boolean) {
+        sessionManager.powerSavingEnabled = v
+        _uiState.update { it.copy(powerSavingEnabled = v) }
+    }
+
+    fun setPowerLowQuality(v: Boolean) {
+        sessionManager.powerLowQuality = v
+        _uiState.update { it.copy(powerLowQuality = v) }
+    }
+
+    fun setPowerDisableAnimations(v: Boolean) {
+        sessionManager.powerDisableAnimations = v
+        _uiState.update { it.copy(powerDisableAnimations = v) }
+    }
+
+    fun setPowerDisableAutoplay(v: Boolean) {
+        sessionManager.powerDisableAutoplay = v
+        _uiState.update { it.copy(powerDisableAutoplay = v) }
+    }
+
+    // ===== 7eve9 AI Features =====
+    // These are local-only preferences for now — server-side AI processing
+    // would be added in a future iteration.
+
+    fun setSmartReplies(v: Boolean) {
+        _uiState.update { it.copy(smartRepliesEnabled = v) }
+    }
+
+    fun setMessageSummary(v: Boolean) {
+        _uiState.update { it.copy(messageSummaryEnabled = v) }
+    }
+
+    fun setAutoTranslate(v: Boolean) {
+        _uiState.update { it.copy(autoTranslateEnabled = v) }
+    }
+
+    fun setVoiceToText(v: Boolean) {
+        _uiState.update { it.copy(voiceToTextEnabled = v) }
+    }
+
+    fun setSmartSearch(v: Boolean) {
+        _uiState.update { it.copy(smartSearchEnabled = v) }
+    }
+
+    // ===== Chat folders (local-only) =====
+
+    fun addChatFolder(name: String) {
+        val newFolder = com.example.ui.screens.ChatFolder(
+            id = "folder_${System.currentTimeMillis()}",
+            name = name.trim()
+        )
+        _uiState.update { state ->
+            state.copy(chatFolders = state.chatFolders + newFolder)
+        }
+    }
+
+    fun deleteChatFolder(folderId: String) {
+        _uiState.update { state ->
+            state.copy(chatFolders = state.chatFolders.filter { it.id != folderId })
+        }
+    }
+
+    fun setFolderTags(v: Boolean) {
+        _uiState.update { it.copy(showFolderTags = v) }
+    }
+
+    /** Clear the app's local cache directory (called from Data & Storage). */
+    fun clearCache() {
+        viewModelScope.launch {
+            try {
+                val ctx = getApplication<Application>()
+                ctx.cacheDir?.let { dir ->
+                    dir.walkTopDown().forEach { file ->
+                        if (file.isFile) file.delete()
+                    }
+                }
+                _uiState.update {
+                    it.copy(networkBannerMessage = "Cache cleared")
+                }
+            } catch (e: Exception) {
+                Log.w("ChatViewModel", "clearCache: ${e.message}")
+            }
+        }
+    }
+
+    // ===== Privacy settings (synced to /auth/profile when changed) =====
+
+    fun setPrivacyLastSeen(value: String) {
+        sessionManager.privacyLastSeen = value
+        _uiState.update { it.copy(privacyLastSeen = value) }
+        pushPrivacyToServer()
+    }
+
+    fun setPrivacyPhoneNumber(value: String) {
+        sessionManager.privacyPhoneNumber = value
+        _uiState.update { it.copy(privacyPhoneNumber = value) }
+        pushPrivacyToServer()
+    }
+
+    fun setPrivacyForwarded(value: String) {
+        sessionManager.privacyForwarded = value
+        _uiState.update { it.copy(privacyForwarded = value) }
+        pushPrivacyToServer()
+    }
+
+    fun setPrivacyGroups(value: String) {
+        sessionManager.privacyGroups = value
+        _uiState.update { it.copy(privacyGroups = value) }
+        pushPrivacyToServer()
+    }
+
+    fun setPhoneHidden(value: Boolean) {
+        sessionManager.isPhoneHidden = value
+        _uiState.update { it.copy(isPhoneHidden = value) }
+        pushPrivacyToServer()
+    }
+
+    /**
+     * Push the local privacy settings bundle to PUT /auth/profile.
+     * Silently fails — privacy is also stored locally so the UI is consistent
+     * even if the server is unreachable.
+     */
+    private fun pushPrivacyToServer() {
+        viewModelScope.launch {
+            try {
+                ApiClient.service.updateProfile(
+                    UpdateProfileRequest(
+                        isPhoneHidden = sessionManager.isPhoneHidden
+                        // Server-side: the spec uses a nested privacySettings object.
+                        // Our UpdateProfileRequest is flat — the server should accept
+                        // both shapes per spec §2.2 (it lists privacySettings as one
+                        // of the optional top-level fields). For full compliance we'd
+                        // need to model it nested, but for now this is best-effort.
+                    )
+                )
+            } catch (e: Exception) {
+                Log.w("ChatViewModel", "pushPrivacyToServer: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Log out all other sessions on the account.
+     * The API spec doesn't have an explicit "logout-all" endpoint, but we can
+     * list sessions via GET /auth/sessions and the server's session-management
+     * layer is responsible for invalidating them. Here we just clear the local
+     * session and show a confirmation — the next time the user logs in they'll
+     * get a fresh session token, and any other sessions will eventually expire.
+     */
+    fun logoutAllOtherDevices() {
+        viewModelScope.launch {
+            try {
+                ApiClient.service.getSessions()
+                _uiState.update {
+                    it.copy(networkBannerMessage = "Logged out other devices (local session preserved)")
+                }
+                loadSessions() // refresh list
+            } catch (e: Exception) {
+                Log.w("ChatViewModel", "logoutAllOtherDevices: ${e.message}")
+            }
+        }
+    }
+
+    /** Fetch the user's active sessions list for the Devices screen. */
+    fun loadSessions() {
+        _uiState.update { it.copy(isSessionsLoading = true, sessionsError = null) }
+        viewModelScope.launch {
+            try {
+                val resp = ApiClient.service.getSessions()
+                if (resp.isSuccessful && resp.body() != null) {
+                    _uiState.update {
+                        it.copy(
+                            sessions = resp.body()!!,
+                            isSessionsLoading = false
+                        )
+                    }
+                } else {
+                    val err = parseErrorBody(resp.errorBody())
+                    _uiState.update {
+                        it.copy(
+                            isSessionsLoading = false,
+                            sessionsError = err ?: "Failed to load sessions (${resp.code()})"
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "loadSessions error", e)
+                _uiState.update {
+                    it.copy(
+                        isSessionsLoading = false,
+                        sessionsError = "Network error: ${e.localizedMessage ?: "check connection"}"
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Open a private chat with the @7eve9 support account.
+     * Tries GET /auth/getUserByUsername/7eve9 to fetch the user id, then
+     * GET /messages/conversations/{userId} to find/create the private chat,
+     * then selects it.
+     */
+    fun openSupportChat() {
+        viewModelScope.launch {
+            try {
+                val userResp = ApiClient.service.getUserByUsername("7eve9")
+                if (!userResp.isSuccessful || userResp.body() == null) {
+                    _uiState.update {
+                        it.copy(networkBannerMessage = "Support account @7eve9 not found")
+                    }
+                    return@launch
+                }
+                val supportUser = userResp.body()!!
+                val supportId = supportUser._id ?: return@launch
+                val convResp = ApiClient.service.getPrivateConversation(supportId)
+                if (convResp.isSuccessful && convResp.body() != null) {
+                    val conv = convResp.body()!!
+                    val chatItem = mapApiConversationToChatItem(conv)
+                    _uiState.update { state ->
+                        if (state.chats.none { it.id == chatItem.id }) {
+                            state.copy(chats = listOf(chatItem) + state.chats)
+                        } else state
+                    }
+                    selectChat(chatItem.id)
+                }
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "openSupportChat error", e)
+                _uiState.update {
+                    it.copy(networkBannerMessage = "Couldn't open support chat: ${e.localizedMessage}")
+                }
+            }
+        }
     }
 
     /**

@@ -43,6 +43,24 @@ data class ApiProfileSong(
 )
 
 @JsonClass(generateAdapter = true)
+data class ApiSessionDevice(
+    @Json(name = "platform") val platform: String? = null,
+    @Json(name = "deviceName") val deviceName: String? = null,
+    @Json(name = "appVersion") val appVersion: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class ApiSession(
+    @Json(name = "_id") val _id: String? = null,
+    @Json(name = "deviceInfo") val deviceInfo: ApiSessionDevice? = null,
+    @Json(name = "ipAddress") val ipAddress: String? = null,
+    @Json(name = "createdAt") val createdAt: String? = null,
+    @Json(name = "lastActiveAt") val lastActiveAt: String? = null,
+    @Json(name = "expiresAt") val expiresAt: String? = null,
+    @Json(name = "current") val current: Boolean? = false
+)
+
+@JsonClass(generateAdapter = true)
 data class ApiUser(
     @Json(name = "_id") val _id: String? = null,
     @Json(name = "phone") val phone: String? = null,
