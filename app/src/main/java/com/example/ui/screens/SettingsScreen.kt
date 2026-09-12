@@ -42,13 +42,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.api.ApiUser
+import com.example.ui.theme.appPalette
 import com.example.ui.components.TelegramBottomNav
-import com.example.ui.theme.TelegramChatListBg
-import com.example.ui.theme.TelegramPrimary
-import com.example.ui.theme.TelegramSurface
-import com.example.ui.theme.TelegramTextPrimary
-import com.example.ui.theme.TelegramTextSecondary
-
 object SettingsRoute {
     const val PRIVACY = "privacy"
     const val CHAT = "chat"
@@ -58,7 +53,6 @@ object SettingsRoute {
     const val POWER = "power"
     const val LANGUAGE = "language"
 }
-
 @Composable
 fun SettingsScreen(
     meUser: ApiUser?,
@@ -70,29 +64,28 @@ fun SettingsScreen(
     onAskQuestion: () -> Unit
 ) {
     Scaffold(
-        containerColor = TelegramChatListBg,
+        containerColor = appPalette.chatListBg,
         topBar = {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(TelegramChatListBg)
+                    .background(appPalette.chatListBg)
                     .statusBarsPadding()
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = "Settings",
-                    color = TelegramTextPrimary,
+                    color = appPalette.textPrimary,
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f)
                 )
                 IconButton(onClick = { /* search settings — future */ }) {
-                    Icon(Icons.Default.Search, contentDescription = "Search", tint = TelegramTextSecondary)
+                    Icon(Icons.Default.Search, contentDescription = "Search", tint = appPalette.textSecondary)
                 }
                 IconButton(onClick = { /* overflow menu — future */ }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "More", tint = TelegramTextSecondary)
-                }
+                    Icon(Icons.Default.MoreVert, contentDescription = "More", tint = appPalette.textSecondary)
             }
         },
         bottomBar = {
@@ -120,79 +113,50 @@ fun SettingsScreen(
                         subtitle = buildAccountSubtitle(meUser),
                         onClick = { /* opens profile screen — user can edit there */ }
                     )
-                    SettingsItem(
                         icon = Icons.Default.Chat,
                         iconColor = Color(0xFFF39C12),
                         title = "Chat Settings",
                         subtitle = "Wallpaper, Theme, Animations, Reactions",
                         onClick = { onOpenRoute(SettingsRoute.CHAT) }
-                    )
-                    SettingsItem(
                         icon = Icons.Default.Lock,
                         iconColor = Color(0xFF58D68D),
                         title = "Privacy & Security",
                         subtitle = "Last Seen, Phone, Devices",
                         onClick = { onOpenRoute(SettingsRoute.PRIVACY) }
-                    )
-                    SettingsItem(
                         icon = Icons.Default.Storage,
                         iconColor = Color(0xFF7FB3D5),
                         title = "Data and Storage",
                         subtitle = "Cache, Auto-download, Gallery",
                         onClick = { onOpenRoute(SettingsRoute.DATA) }
-                    )
-                    SettingsItem(
                         icon = Icons.Default.Folder,
                         iconColor = Color(0xFF5499C7),
                         title = "Chat Folders",
                         subtitle = "Organize chats into folders",
                         onClick = { onOpenRoute(SettingsRoute.FOLDERS) }
-                    )
-                    SettingsItem(
                         icon = Icons.Default.Devices,
                         iconColor = Color(0xFF48C9B0),
                         title = "Devices",
                         subtitle = "Active sessions, Log out all",
                         onClick = { onOpenRoute(SettingsRoute.DEVICES) }
-                    )
-                    SettingsItem(
                         icon = Icons.Default.BatteryChargingFull,
                         iconColor = Color(0xFFEB984E),
                         title = "Power Saving",
                         subtitle = "Reduce battery usage",
                         onClick = { onOpenRoute(SettingsRoute.POWER) }
-                    )
-                    SettingsItem(
                         icon = Icons.Default.Language,
                         iconColor = Color(0xFFBB8FCE),
                         title = "Language",
                         subtitle = if (meUser != null) "Persian / English" else "Select language",
                         onClick = { onOpenRoute(SettingsRoute.LANGUAGE) }
-                    )
-                }
-            }
-
             item { Spacer(modifier = Modifier.height(12.dp)) }
-
             // === Help card ===
-            item {
-                SettingsCard {
                     SectionHeader("Help")
-                    SettingsItem(
                         icon = Icons.Default.QuestionAnswer,
-                        iconColor = Color(0xFFF39C12),
                         title = "Ask a Question",
                         subtitle = "Chat with @7eve9 support",
                         onClick = onAskQuestion
-                    )
-                }
-            }
-
             item { Spacer(modifier = Modifier.height(20.dp)) }
-
             // === Logout ===
-            item {
-                SettingsCard {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -208,14 +172,8 @@ fun SettingsScreen(
                             fontWeight = FontWeight.SemiBold
                         )
                     }
-                }
-            }
-
             item { Spacer(modifier = Modifier.height(80.dp)) }
-        }
     }
-}
-
 /**
  * Build the subtitle for the "Account" row using real data from /auth/me.
  * Shows whichever fields are available: phone, @username, bio.
@@ -227,4 +185,3 @@ internal fun buildAccountSubtitle(me: ApiUser?): String {
     me.username?.takeIf { it.isNotBlank() }?.let { parts.add("@$it") }
     me.bio?.takeIf { it.isNotBlank() }?.let { parts.add(it) }
     return if (parts.isEmpty()) "Tap to set up your account" else parts.joinToString(", ")
-}

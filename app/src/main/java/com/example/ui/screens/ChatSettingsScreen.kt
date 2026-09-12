@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import com.example.ui.theme.appPalette
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -51,16 +52,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.theme.TelegramChatListBg
-import com.example.ui.theme.TelegramPrimary
-import com.example.ui.theme.TelegramSurface
-import com.example.ui.theme.TelegramTextMuted
-import com.example.ui.theme.TelegramTextPrimary
-import com.example.ui.theme.TelegramTextSecondary
-
 /** Common emojis for double-tap reaction picker */
 private val QUICK_EMOJIS = listOf("❤️", "👍", "🔥", "😂", "😮", "😢", "👏", "🙏", "🎉", "💯", "👀", "✨")
-
 @Composable
 fun ChatSettingsScreen(
     messageTextSize: Int,
@@ -74,9 +67,8 @@ fun ChatSettingsScreen(
     onBack: () -> Unit
 ) {
     var showEmojiPicker by remember { mutableStateOf(false) }
-
     Scaffold(
-        containerColor = TelegramChatListBg,
+        containerColor = appPalette.chatListBg,
         topBar = { SettingsTopBar(title = "Chat Settings", onBack = onBack) }
     ) { padding ->
         LazyColumn(
@@ -105,29 +97,24 @@ fun ChatSettingsScreen(
                             valueRange = 12f..22f,
                             steps = 9,
                             colors = SliderDefaults.colors(
-                                thumbColor = TelegramPrimary,
-                                activeTrackColor = TelegramPrimary,
-                                inactiveTrackColor = TelegramTextMuted.copy(alpha = 0.3f)
+                                thumbColor = appPalette.primary,
+                                activeTrackColor = appPalette.primary,
+                                inactiveTrackColor = appPalette.textMuted.copy(alpha = 0.3f)
                             ),
                             modifier = Modifier.weight(1f)
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
                             text = messageTextSize.toString(),
-                            color = TelegramPrimary,
+                            color = appPalette.primary,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.width(28.dp)
-                        )
                     }
                 }
             }
-
             item { Spacer(modifier = Modifier.height(12.dp)) }
-
             // === Wallpaper & Name Color ===
-            item {
-                SettingsCard {
                     SectionHeader("Appearance")
                     InfoRow(
                         icon = Icons.Default.Wallpaper,
@@ -136,22 +123,13 @@ fun ChatSettingsScreen(
                         subtitle = "Pick a background for your chats",
                         onClick = { /* TODO: wallpaper picker — future */ }
                     )
-                    InfoRow(
                         icon = Icons.Default.Palette,
                         iconColor = Color(0xFFBB8FCE),
                         title = "Change Name Color",
                         subtitle = "Color your name in chats",
                         value = "Default",
                         onClick = { /* TODO: color picker — future */ }
-                    )
-                }
-            }
-
-            item { Spacer(modifier = Modifier.height(12.dp)) }
-
             // === Display Mode ===
-            item {
-                SettingsCard {
                     SectionHeader("Display Mode")
                     ToggleRow(
                         icon = Icons.Default.BrightnessMedium,
@@ -160,85 +138,36 @@ fun ChatSettingsScreen(
                         subtitle = if (isDarkMode) "Currently using dark theme" else "Currently using light theme",
                         checked = !isDarkMode,
                         onCheckedChange = { onToggleDarkMode() }
-                    )
-                    InfoRow(
                         icon = Icons.Default.FormatPaint,
                         iconColor = Color(0xFFEC7063),
                         title = "Browse Themes",
                         subtitle = "Choose from preset themes",
                         onClick = { /* TODO: theme browser — future */ }
-                    )
-                }
-            }
-
-            item { Spacer(modifier = Modifier.height(12.dp)) }
-
             // === Message corners slider ===
-            item {
-                SettingsCard {
                     SectionHeader("Message corners")
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
                         var sliderValue by remember(messageCornerRadius) {
                             mutableFloatStateOf(messageCornerRadius.toFloat())
-                        }
-                        Slider(
-                            value = sliderValue,
-                            onValueChange = { sliderValue = it },
                             onValueChangeFinished = { onSetCornerRadius(sliderValue.toInt()) },
                             valueRange = 0f..28f,
                             steps = 27,
-                            colors = SliderDefaults.colors(
-                                thumbColor = TelegramPrimary,
-                                activeTrackColor = TelegramPrimary,
-                                inactiveTrackColor = TelegramTextMuted.copy(alpha = 0.3f)
-                            ),
-                            modifier = Modifier.weight(1f)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
                             text = messageCornerRadius.toString(),
-                            color = TelegramPrimary,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.width(28.dp)
-                        )
-                    }
-                }
-            }
-
-            item { Spacer(modifier = Modifier.height(12.dp)) }
-
             // === Double-tap reaction emoji ===
-            item {
-                SettingsCard {
                     SectionHeader("Double-tap Reaction")
-                    InfoRow(
                         icon = Icons.Default.TouchApp,
-                        iconColor = Color(0xFFEC7063),
                         title = "Quick Reaction",
                         subtitle = "Tap a message twice to send this emoji",
                         value = doubleTapEmoji,
                         onClick = { showEmojiPicker = true }
-                    )
-                }
-            }
-
             item { Spacer(modifier = Modifier.height(80.dp)) }
         }
     }
-
     // Emoji picker dialog
     if (showEmojiPicker) {
         AlertDialog(
             onDismissRequest = { showEmojiPicker = false },
-            containerColor = TelegramSurface,
-            titleContentColor = TelegramTextPrimary,
-            title = { Text("Quick Reaction", color = TelegramTextPrimary) },
+            containerColor = appPalette.surface,
+            titleContentColor = appPalette.textPrimary,
+            title = { Text("Quick Reaction", color = appPalette.textPrimary) },
             text = {
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(4),
@@ -251,7 +180,7 @@ fun ChatSettingsScreen(
                                 .size(48.dp)
                                 .clip(CircleShape)
                                 .background(
-                                    if (emoji == doubleTapEmoji) TelegramPrimary.copy(alpha = 0.2f)
+                                    if (emoji == doubleTapEmoji) appPalette.primary.copy(alpha = 0.2f)
                                     else Color.Transparent
                                 )
                                 .clickable {
@@ -261,15 +190,9 @@ fun ChatSettingsScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(text = emoji, fontSize = 26.sp)
-                        }
-                    }
-                }
             },
             confirmButton = {
                 TextButton(onClick = { showEmojiPicker = false }) {
-                    Text("Close", color = TelegramTextSecondary)
-                }
-            }
+                    Text("Close", color = appPalette.textSecondary)
         )
-    }
 }

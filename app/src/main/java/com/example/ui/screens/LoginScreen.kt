@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import com.example.ui.theme.appPalette
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -66,12 +67,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
-import com.example.ui.theme.TelegramAccent
-import com.example.ui.theme.TelegramDarkBg
-import com.example.ui.theme.TelegramPrimary
-import com.example.ui.theme.TelegramTextMuted
-import com.example.ui.theme.TelegramTextPrimary
-import com.example.ui.theme.TelegramTextSecondary
 import kotlinx.coroutines.delay
 
 enum class AuthStep {
@@ -114,7 +109,7 @@ fun LoginScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(TelegramDarkBg)
+            .background(appPalette.bg)
             .statusBarsPadding()
             .navigationBarsPadding()
             .imePadding()
@@ -156,7 +151,7 @@ fun LoginScreen(
                     .clip(CircleShape)
                     .background(
                         Brush.linearGradient(
-                            listOf(TelegramAccent, TelegramPrimary)
+                            listOf(appPalette.accent, appPalette.primary)
                         )
                     )
                     .padding(3.dp),
@@ -186,14 +181,14 @@ fun LoginScreen(
                         AuthStep.PHONE_INPUT -> {
                             Text(
                                 text = "Your Phone Number",
-                                color = TelegramTextPrimary,
+                                color = appPalette.textPrimary,
                                 fontSize = 22.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 text = "Please enter your phone number to sign in or register with 7eve9chat.",
-                                color = TelegramTextSecondary,
+                                color = appPalette.textSecondary,
                                 fontSize = 14.sp,
                                 textAlign = TextAlign.Center,
                                 lineHeight = 20.sp,
@@ -211,15 +206,15 @@ fun LoginScreen(
                                 OutlinedTextField(
                                     value = countryCode,
                                     onValueChange = { countryCode = it },
-                                    label = { Text("Code", color = TelegramTextMuted) },
+                                    label = { Text("Code", color = appPalette.textMuted) },
                                     singleLine = true,
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                                     colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = TelegramPrimary,
+                                        focusedBorderColor = appPalette.primary,
                                         unfocusedBorderColor = Color(0xFF2C3E50),
-                                        focusedTextColor = TelegramTextPrimary,
-                                        unfocusedTextColor = TelegramTextPrimary,
-                                        cursorColor = TelegramPrimary
+                                        focusedTextColor = appPalette.textPrimary,
+                                        unfocusedTextColor = appPalette.textPrimary,
+                                        cursorColor = appPalette.primary
                                     ),
                                     modifier = Modifier.width(90.dp)
                                 )
@@ -230,8 +225,8 @@ fun LoginScreen(
                                 OutlinedTextField(
                                     value = phoneNumber,
                                     onValueChange = { phoneNumber = it },
-                                    label = { Text("Phone Number", color = TelegramTextMuted) },
-                                    placeholder = { Text("912 123 4567", color = TelegramTextMuted) },
+                                    label = { Text("Phone Number", color = appPalette.textMuted) },
+                                    placeholder = { Text("912 123 4567", color = appPalette.textMuted) },
                                     singleLine = true,
                                     trailingIcon = {
                                         if (phoneNumber.isNotEmpty()) {
@@ -239,7 +234,7 @@ fun LoginScreen(
                                                 Icon(
                                                     imageVector = Icons.Default.Close,
                                                     contentDescription = "Clear",
-                                                    tint = TelegramTextSecondary
+                                                    tint = appPalette.textSecondary
                                                 )
                                             }
                                         }
@@ -258,11 +253,11 @@ fun LoginScreen(
                                         }
                                     ),
                                     colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = TelegramPrimary,
+                                        focusedBorderColor = appPalette.primary,
                                         unfocusedBorderColor = Color(0xFF2C3E50),
-                                        focusedTextColor = TelegramTextPrimary,
-                                        unfocusedTextColor = TelegramTextPrimary,
-                                        cursorColor = TelegramPrimary
+                                        focusedTextColor = appPalette.textPrimary,
+                                        unfocusedTextColor = appPalette.textPrimary,
+                                        cursorColor = appPalette.primary
                                     ),
                                     modifier = Modifier.weight(1f)
                                 )
@@ -292,8 +287,8 @@ fun LoginScreen(
                                 },
                                 enabled = phoneNumber.isNotBlank() && !isLoading,
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = TelegramPrimary,
-                                    disabledContainerColor = TelegramPrimary.copy(alpha = 0.5f)
+                                    containerColor = appPalette.primary,
+                                    disabledContainerColor = appPalette.primary.copy(alpha = 0.5f)
                                 ),
                                 shape = RoundedCornerShape(24.dp),
                                 modifier = Modifier
@@ -329,7 +324,7 @@ fun LoginScreen(
                         AuthStep.OTP_VERIFY -> {
                             Text(
                                 text = "Enter Code",
-                                color = TelegramTextPrimary,
+                                color = appPalette.textPrimary,
                                 fontSize = 22.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -340,7 +335,7 @@ fun LoginScreen(
                             ) {
                                 Text(
                                     text = "Code sent to +$fullPhone",
-                                    color = TelegramTextSecondary,
+                                    color = appPalette.textSecondary,
                                     fontSize = 14.sp
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
@@ -354,7 +349,7 @@ fun LoginScreen(
                                     Icon(
                                         imageVector = Icons.Default.Edit,
                                         contentDescription = "Edit phone",
-                                        tint = TelegramPrimary,
+                                        tint = appPalette.primary,
                                         modifier = Modifier.size(16.dp)
                                     )
                                 }
@@ -373,8 +368,8 @@ fun LoginScreen(
                                         }
                                     }
                                 },
-                                label = { Text("Confirmation Code (کد تأیید)", color = TelegramTextMuted) },
-                                placeholder = { Text("Code", color = TelegramTextMuted) },
+                                label = { Text("Confirmation Code (کد تأیید)", color = appPalette.textMuted) },
+                                placeholder = { Text("Code", color = appPalette.textMuted) },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(
                                     keyboardType = KeyboardType.NumberPassword,
@@ -389,11 +384,11 @@ fun LoginScreen(
                                     }
                                 ),
                                 colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = TelegramPrimary,
+                                    focusedBorderColor = appPalette.primary,
                                     unfocusedBorderColor = Color(0xFF2C3E50),
-                                    focusedTextColor = TelegramTextPrimary,
-                                    unfocusedTextColor = TelegramTextPrimary,
-                                    cursorColor = TelegramPrimary
+                                    focusedTextColor = appPalette.textPrimary,
+                                    unfocusedTextColor = appPalette.textPrimary,
+                                    cursorColor = appPalette.primary
                                 ),
                                 modifier = Modifier.fillMaxWidth()
                             )
@@ -421,8 +416,8 @@ fun LoginScreen(
                                 },
                                 enabled = otpCode.isNotBlank() && !isLoading,
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = TelegramPrimary,
-                                    disabledContainerColor = TelegramPrimary.copy(alpha = 0.5f)
+                                    containerColor = appPalette.primary,
+                                    disabledContainerColor = appPalette.primary.copy(alpha = 0.5f)
                                 ),
                                 shape = RoundedCornerShape(24.dp),
                                 modifier = Modifier
@@ -458,7 +453,7 @@ fun LoginScreen(
                             if (timerSeconds > 0) {
                                 Text(
                                     text = "Resend code in 0:${if (timerSeconds < 10) "0$timerSeconds" else "$timerSeconds"}",
-                                    color = TelegramTextMuted,
+                                    color = appPalette.textMuted,
                                     fontSize = 13.sp
                                 )
                             } else {
@@ -468,7 +463,7 @@ fun LoginScreen(
                                 }) {
                                     Text(
                                         text = "Resend SMS / ارسال مجدد پیامک",
-                                        color = TelegramPrimary,
+                                        color = appPalette.primary,
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.SemiBold
                                     )

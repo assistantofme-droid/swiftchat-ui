@@ -65,14 +65,7 @@ import androidx.core.content.ContextCompat
 import com.example.data.api.ApiContact
 import com.example.ui.components.AvatarView
 import com.example.ui.components.TelegramBottomNav
-import com.example.ui.theme.TelegramChatListBg
-import com.example.ui.theme.TelegramPrimary
-import com.example.ui.theme.TelegramSurface
-import com.example.ui.theme.TelegramSurfaceVariant
-import com.example.ui.theme.TelegramTextMuted
-import com.example.ui.theme.TelegramTextPrimary
-import com.example.ui.theme.TelegramTextSecondary
-
+import com.example.ui.theme.appPalette
 /**
  * Contacts screen — shows REAL device contacts filtered down to only
  * registered 7eve9Chat users. Per the user's spec:
@@ -82,7 +75,6 @@ import com.example.ui.theme.TelegramTextSecondary
  *   - New Channel button
  *   - Below: list of device contacts who are registered users
  *     (POST /auth/check-contacts returns only registered users)
- *
  * Tapping a contact opens a private chat with them via
  * GET /messages/conversations/{userId}.
  */
@@ -113,14 +105,11 @@ fun ContactsScreen(
                 PackageManager.PERMISSION_GRANTED
         )
     }
-
     val contactsPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
         hasContactsPermission = granted
         if (granted) onLaunchLoad()
-    }
-
     // First time the screen is shown: ask for contacts permission + load
     LaunchedEffect(Unit) {
         if (hasContactsPermission) {
@@ -128,27 +117,19 @@ fun ContactsScreen(
         } else {
             contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
         }
-    }
-
     // Show add-contact feedback as a snackbar
     LaunchedEffect(addContactStatus) {
         if (!addContactStatus.isNullOrBlank()) {
             snackbarHostState.showSnackbar(addContactStatus)
             onClearAddStatus()
-        }
-    }
-
     val filtered = remember(contacts, query) {
         if (query.isBlank()) contacts
         else contacts.filter {
             (it.name?.contains(query, ignoreCase = true) == true) ||
                     (it.username?.contains(query, ignoreCase = true) == true) ||
                     (it.phone?.contains(query) == true)
-        }
-    }
-
     Scaffold(
-        containerColor = TelegramChatListBg,
+        containerColor = appPalette.chatListBg,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = { ContactsHeader() },
         bottomBar = {
@@ -162,14 +143,13 @@ fun ContactsScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { showAddDialog = true },
-                containerColor = TelegramPrimary,
+                containerColor = appPalette.primary,
                 contentColor = Color.White,
                 shape = CircleShape,
                 modifier = Modifier.padding(bottom = 16.dp)
             ) {
                 Icon(Icons.Default.PersonAdd, contentDescription = "Add contact")
             }
-        }
     ) { padding ->
         Box(
             modifier = Modifier
@@ -178,7 +158,6 @@ fun ContactsScreen(
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 SearchBar(query = query, onQueryChange = { query = it })
-
                 // === New Group / New Channel buttons ===
                 Row(
                     modifier = Modifier
@@ -192,14 +171,10 @@ fun ContactsScreen(
                         label = "New Group",
                         onClick = { showCreateGroupDialog = true }
                     )
-                    ActionChip(
-                        modifier = Modifier.weight(1f),
                         icon = Icons.Default.Campaign,
                         label = "New Channel",
                         onClick = { showCreateChannelDialog = true }
-                    )
                 }
-
                 when {
                     !hasContactsPermission -> {
                         PermissionPrompt(
@@ -211,47 +186,30 @@ fun ContactsScreen(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
-                            CircularProgressIndicator(color = TelegramPrimary)
+                            CircularProgressIndicator(color = appPalette.primary)
                         }
-                    }
                     errorMessage != null && contacts.isEmpty() -> {
                         ErrorState(
                             message = errorMessage,
                             onRetry = { onLaunchLoad() }
-                        )
-                    }
                     filtered.isEmpty() && contacts.isNotEmpty() -> {
                         EmptyState(message = "No contacts match \"$query\"")
-                    }
                     filtered.isEmpty() -> {
                         EmptyState(
                             message = "None of your device contacts are on 7eve9Chat yet. " +
                                 "Tap + to invite someone by username or phone."
-                        )
-                    }
                     else -> {
                         LazyColumn(modifier = Modifier.fillMaxSize()) {
                             items(filtered, key = { it._id ?: it.username ?: it.phone ?: it.name ?: "" }) { contact ->
                                 ContactRow(contact = contact, onClick = { onContactClick(contact) })
                             }
                             item { Spacer(modifier = Modifier.height(80.dp)) }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     if (showAddDialog) {
         AddContactDialog(
             onDismiss = { showAddDialog = false },
             onAdd = { identifier ->
                 onAddContact(identifier)
                 showAddDialog = false
-            }
-        )
-    }
-
     if (showCreateGroupDialog) {
         CreateConversationDialog(
             title = "New Group",
@@ -260,71 +218,45 @@ fun ContactsScreen(
             onCreate = { name, type, description ->
                 onCreateGroup(name, type, description)
                 showCreateGroupDialog = false
-            }
-        )
-    }
-
     if (showCreateChannelDialog) {
-        CreateConversationDialog(
             title = "New Channel",
             type = "channel",
             onDismiss = { showCreateChannelDialog = false },
-            onCreate = { name, type, description ->
-                onCreateGroup(name, type, description)
                 showCreateChannelDialog = false
-            }
-        )
-    }
 }
-
-@Composable
 private fun CreateConversationDialog(
     title: String,
     type: String,
     onDismiss: () -> Unit,
     onCreate: (name: String, type: String, description: String?) -> Unit
-) {
     var name by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
-
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = TelegramSurface,
-        titleContentColor = TelegramTextPrimary,
-        title = { Text(title, color = TelegramTextPrimary, fontWeight = FontWeight.Bold) },
+        containerColor = appPalette.surface,
+        titleContentColor = appPalette.textPrimary,
+        title = { Text(title, color = appPalette.textPrimary, fontWeight = FontWeight.Bold) },
         text = {
             Column {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it.take(64) },
-                    label = { Text("Name", color = TelegramTextSecondary) },
+                    label = { Text("Name", color = appPalette.textSecondary) },
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = TelegramPrimary,
-                        unfocusedBorderColor = TelegramSurfaceVariant,
-                        focusedTextColor = TelegramTextPrimary,
-                        unfocusedTextColor = TelegramTextPrimary,
-                        cursorColor = TelegramPrimary
+                        focusedBorderColor = appPalette.primary,
+                        unfocusedBorderColor = appPalette.surfaceVariant,
+                        focusedTextColor = appPalette.textPrimary,
+                        unfocusedTextColor = appPalette.textPrimary,
+                        cursorColor = appPalette.primary
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(12.dp))
-                OutlinedTextField(
                     value = description,
                     onValueChange = { description = it.take(255) },
-                    label = { Text("Description (optional)", color = TelegramTextSecondary) },
+                    label = { Text("Description (optional)", color = appPalette.textSecondary) },
                     maxLines = 3,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = TelegramPrimary,
-                        unfocusedBorderColor = TelegramSurfaceVariant,
-                        focusedTextColor = TelegramTextPrimary,
-                        unfocusedTextColor = TelegramTextPrimary,
-                        cursorColor = TelegramPrimary
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        },
         confirmButton = {
             TextButton(
                 onClick = {
@@ -333,283 +265,136 @@ private fun CreateConversationDialog(
                             name.trim(),
                             type,
                             description.takeIf { it.isNotBlank() }
-                        )
-                    }
-                }
-            ) { Text("Create", color = TelegramPrimary, fontWeight = FontWeight.SemiBold) }
-        },
+            ) { Text("Create", color = appPalette.primary, fontWeight = FontWeight.SemiBold) }
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel", color = TelegramTextSecondary)
-            }
-        }
+                Text("Cancel", color = appPalette.textSecondary)
     )
-}
-
-@Composable
 private fun ContactsHeader() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(TelegramChatListBg)
+            .background(appPalette.chatListBg)
             .statusBarsPadding()
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = "Contacts",
-            color = TelegramTextPrimary,
+            color = appPalette.textPrimary,
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.weight(1f)
-        )
         IconButton(onClick = { /* future: sort options */ }) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.Sort,
                 contentDescription = "Sort",
-                tint = TelegramTextSecondary
-            )
-        }
-    }
-}
-
-@Composable
+                tint = appPalette.textSecondary
 private fun SearchBar(query: String, onQueryChange: (String) -> Unit) {
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp)
-    ) {
         TextField(
             value = query,
             onValueChange = onQueryChange,
-            placeholder = { Text("Search Contacts", color = TelegramTextSecondary) },
+            placeholder = { Text("Search Contacts", color = appPalette.textSecondary) },
             leadingIcon = {
-                Icon(Icons.Default.Search, contentDescription = null, tint = TelegramTextSecondary)
+                Icon(Icons.Default.Search, contentDescription = null, tint = appPalette.textSecondary)
             },
             trailingIcon = {
                 if (query.isNotEmpty()) {
                     IconButton(onClick = { onQueryChange("") }) {
-                        Icon(Icons.Default.Close, contentDescription = "Clear", tint = TelegramTextSecondary)
-                    }
-                }
-            },
+                        Icon(Icons.Default.Close, contentDescription = "Clear", tint = appPalette.textSecondary)
             singleLine = true,
             shape = RoundedCornerShape(16.dp),
             colors = TextFieldDefaults.colors(
-                focusedContainerColor = TelegramSurface,
-                unfocusedContainerColor = TelegramSurface,
-                cursorColor = TelegramPrimary,
+                focusedContainerColor = appPalette.surface,
+                unfocusedContainerColor = appPalette.surface,
+                cursorColor = appPalette.primary,
                 focusedIndicatorColor = Color.Transparent,
                 unfocusedIndicatorColor = Color.Transparent,
-                focusedTextColor = TelegramTextPrimary,
-                unfocusedTextColor = TelegramTextPrimary
+                focusedTextColor = appPalette.textPrimary,
+                unfocusedTextColor = appPalette.textPrimary
             ),
             modifier = Modifier.fillMaxWidth()
-        )
-    }
-}
-
-@Composable
 private fun ActionChip(
     modifier: Modifier = Modifier,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
     onClick: () -> Unit
-) {
     Surface(
-        color = TelegramSurface,
+        color = appPalette.surface,
         shape = RoundedCornerShape(16.dp),
         modifier = modifier
             .height(52.dp)
             .clickable(onClick = onClick)
-    ) {
         Row(
             modifier = Modifier.fillMaxSize(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
-        ) {
-            Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = TelegramPrimary,
+                tint = appPalette.primary,
                 modifier = Modifier.size(20.dp)
-            )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = label,
-                color = TelegramTextPrimary,
+                color = appPalette.textPrimary,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
-
-@Composable
 private fun ContactRow(contact: ApiContact, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
         AvatarView(
             avatarUrl = contact.avatar,
             title = contact.name ?: contact.username,
             size = 48.dp
-        )
         Spacer(modifier = Modifier.size(16.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(
                 text = contact.name ?: contact.username ?: "Unknown",
-                color = TelegramTextPrimary,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium
-            )
             Spacer(modifier = Modifier.height(2.dp))
-            Text(
                 text = contact.username?.let { "@$it" } ?: contact.phone ?: "last seen recently",
-                color = TelegramTextSecondary,
+                color = appPalette.textSecondary,
                 fontSize = 14.sp
-            )
-        }
         if (contact.isVerified == true) {
             Box(
                 modifier = Modifier
                     .size(20.dp)
-                    .background(TelegramPrimary, CircleShape),
+                    .background(appPalette.primary, CircleShape),
                 contentAlignment = Alignment.Center
-            ) {
                 Text("✓", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-    }
-}
-
-@Composable
 private fun AddContactDialog(
-    onDismiss: () -> Unit,
     onAdd: (String) -> Unit
-) {
     var identifier by remember { mutableStateOf("") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = TelegramSurface,
-        titleContentColor = TelegramTextPrimary,
-        title = { Text("Add Contact", color = TelegramTextPrimary) },
-        text = {
-            Column {
+        title = { Text("Add Contact", color = appPalette.textPrimary) },
                 Text(
                     text = "Enter phone number or @username",
-                    color = TelegramTextSecondary,
+                    color = appPalette.textSecondary,
                     fontSize = 13.sp,
                     modifier = Modifier.padding(bottom = 12.dp)
-                )
-                OutlinedTextField(
                     value = identifier,
                     onValueChange = { identifier = it },
-                    placeholder = { Text("989123456789 or @alice", color = TelegramTextMuted) },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = TelegramPrimary,
-                        unfocusedBorderColor = TelegramSurfaceVariant,
-                        focusedTextColor = TelegramTextPrimary,
-                        unfocusedTextColor = TelegramTextPrimary,
-                        cursorColor = TelegramPrimary
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
+                    placeholder = { Text("989123456789 or @alice", color = appPalette.textMuted) },
                     if (identifier.isNotBlank()) onAdd(identifier.trim())
-                }
-            ) { Text("Add", color = TelegramPrimary, fontWeight = FontWeight.SemiBold) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = TelegramTextSecondary)
-            }
-        }
-    )
-}
-
-@Composable
+            ) { Text("Add", color = appPalette.primary, fontWeight = FontWeight.SemiBold) }
 private fun EmptyState(message: String) {
-    Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
-    ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(
                 imageVector = Icons.Default.Call,
-                contentDescription = null,
-                tint = TelegramTextMuted,
+                tint = appPalette.textMuted,
                 modifier = Modifier.size(48.dp)
-            )
             Spacer(modifier = Modifier.height(12.dp))
-            Text(
                 text = message,
-                color = TelegramTextSecondary,
-                fontSize = 14.sp,
                 modifier = Modifier.padding(horizontal = 32.dp)
-            )
-        }
-    }
-}
-
-@Composable
 private fun PermissionPrompt(onAllow: () -> Unit) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(
                 imageVector = Icons.Default.PersonAdd,
-                contentDescription = null,
-                tint = TelegramTextMuted,
-                modifier = Modifier.size(48.dp)
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
                 text = "Allow access to your contacts to see who's on 7eve9Chat",
-                color = TelegramTextSecondary,
-                fontSize = 14.sp,
-                modifier = Modifier.padding(horizontal = 32.dp)
-            )
             Spacer(modifier = Modifier.height(16.dp))
             TextButton(onClick = onAllow) {
-                Text("Allow Contacts", color = TelegramPrimary, fontWeight = FontWeight.SemiBold)
-            }
-        }
-    }
-}
-
-@Composable
+                Text("Allow Contacts", color = appPalette.primary, fontWeight = FontWeight.SemiBold)
 private fun ErrorState(message: String, onRetry: () -> Unit) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = message,
-                color = TelegramTextSecondary,
-                fontSize = 14.sp,
-                modifier = Modifier.padding(horizontal = 32.dp)
-            )
-            Spacer(modifier = Modifier.height(12.dp))
             TextButton(onClick = onRetry) {
-                Text("Retry", color = TelegramPrimary, fontWeight = FontWeight.SemiBold)
-            }
-        }
-    }
-}
+                Text("Retry", color = appPalette.primary, fontWeight = FontWeight.SemiBold)

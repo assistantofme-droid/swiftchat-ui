@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import com.example.ui.theme.appPalette
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -53,13 +54,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.ui.components.AvatarView
-import com.example.ui.theme.TelegramDarkBg
-import com.example.ui.theme.TelegramPrimary
-import com.example.ui.theme.TelegramSurface
-import com.example.ui.theme.TelegramSurfaceVariant
-import com.example.ui.theme.TelegramTextMuted
-import com.example.ui.theme.TelegramTextPrimary
-import com.example.ui.theme.TelegramTextSecondary
+import com.example.ui.theme.appPalette.bg
+import com.example.ui.theme.appPalette.primary
+import com.example.ui.theme.appPalette.surface
+import com.example.ui.theme.appPalette.surfaceVariant
+import com.example.ui.theme.appPalette.textMuted
+import com.example.ui.theme.appPalette.textPrimary
+import com.example.ui.theme.appPalette.textSecondary
 
 /**
  * First-time setup screen — shown when isNewUser=true OR when the user has no
@@ -102,7 +103,7 @@ fun SetupProfileScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(TelegramDarkBg)
+            .background(appPalette.bg)
             .statusBarsPadding()
             .navigationBarsPadding()
             .imePadding()
@@ -117,14 +118,14 @@ fun SetupProfileScreen(
             // Title
             Text(
                 text = "Set Up Your Profile",
-                color = TelegramTextPrimary,
+                color = appPalette.textPrimary,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "Enter your name and choose a username so others can find you on 7eve9Chat.",
-                color = TelegramTextSecondary,
+                color = appPalette.textSecondary,
                 fontSize = 14.sp,
                 modifier = Modifier.padding(horizontal = 8.dp)
             )
@@ -136,8 +137,8 @@ fun SetupProfileScreen(
                 modifier = Modifier
                     .size(120.dp)
                     .clip(CircleShape)
-                    .background(TelegramSurfaceVariant)
-                    .border(2.dp, TelegramPrimary.copy(alpha = 0.5f), CircleShape)
+                    .background(appPalette.surfaceVariant)
+                    .border(2.dp, appPalette.primary.copy(alpha = 0.5f), CircleShape)
                     .clickable { imagePicker.launch("image/*") },
                 contentAlignment = Alignment.Center
             ) {
@@ -163,13 +164,13 @@ fun SetupProfileScreen(
                             Icon(
                                 imageVector = Icons.Default.CameraAlt,
                                 contentDescription = "Pick avatar",
-                                tint = TelegramTextMuted,
+                                tint = appPalette.textMuted,
                                 modifier = Modifier.size(32.dp)
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = "Photo (optional)",
-                                color = TelegramTextMuted,
+                                color = appPalette.textMuted,
                                 fontSize = 11.sp
                             )
                         }
@@ -183,7 +184,7 @@ fun SetupProfileScreen(
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it.take(50) },
-                label = { Text("Name", color = TelegramTextSecondary) },
+                label = { Text("Name", color = appPalette.textSecondary) },
                 singleLine = true,
                 isError = name.isNotEmpty() && !isNameValid,
                 supportingText = {
@@ -193,11 +194,11 @@ fun SetupProfileScreen(
                 },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = TelegramPrimary,
-                    unfocusedBorderColor = TelegramSurfaceVariant,
-                    focusedTextColor = TelegramTextPrimary,
-                    unfocusedTextColor = TelegramTextPrimary,
-                    cursorColor = TelegramPrimary
+                    focusedBorderColor = appPalette.primary,
+                    unfocusedBorderColor = appPalette.surfaceVariant,
+                    focusedTextColor = appPalette.textPrimary,
+                    unfocusedTextColor = appPalette.textPrimary,
+                    cursorColor = appPalette.primary
                 ),
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth()
@@ -213,14 +214,14 @@ fun SetupProfileScreen(
                     val filtered = newValue.filter { it.isLetterOrDigit() || it == '_' }.take(32)
                     username = filtered
                 },
-                label = { Text("Username", color = TelegramTextSecondary) },
-                prefix = { Text("@", color = TelegramTextMuted) },
+                label = { Text("Username", color = appPalette.textSecondary) },
+                prefix = { Text("@", color = appPalette.textMuted) },
                 singleLine = true,
                 isError = username.isNotEmpty() && !isUsernameValid,
                 supportingText = {
                     when {
                         username.isEmpty() -> {
-                            Text("5-32 characters. Letters, numbers, underscore only.", color = TelegramTextMuted, fontSize = 12.sp)
+                            Text("5-32 characters. Letters, numbers, underscore only.", color = appPalette.textMuted, fontSize = 12.sp)
                         }
                         !isUsernameValid -> {
                             Text("Must be 5-32 chars, letters/numbers/_ only", color = Color(0xFFFF5252), fontSize = 12.sp)
@@ -235,11 +236,11 @@ fun SetupProfileScreen(
                     imeAction = ImeAction.Done
                 ),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = TelegramPrimary,
-                    unfocusedBorderColor = TelegramSurfaceVariant,
-                    focusedTextColor = TelegramTextPrimary,
-                    unfocusedTextColor = TelegramTextPrimary,
-                    cursorColor = TelegramPrimary
+                    focusedBorderColor = appPalette.primary,
+                    unfocusedBorderColor = appPalette.surfaceVariant,
+                    focusedTextColor = appPalette.textPrimary,
+                    unfocusedTextColor = appPalette.textPrimary,
+                    cursorColor = appPalette.primary
                 ),
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth()
@@ -250,7 +251,7 @@ fun SetupProfileScreen(
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
                     text = "Phone: +$prefillPhone",
-                    color = TelegramTextMuted,
+                    color = appPalette.textMuted,
                     fontSize = 12.sp
                 )
             }
@@ -278,8 +279,8 @@ fun SetupProfileScreen(
                 },
                 enabled = canSubmit,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = TelegramPrimary,
-                    disabledContainerColor = TelegramPrimary.copy(alpha = 0.4f)
+                    containerColor = appPalette.primary,
+                    disabledContainerColor = appPalette.primary.copy(alpha = 0.4f)
                 ),
                 shape = RoundedCornerShape(24.dp),
                 modifier = Modifier

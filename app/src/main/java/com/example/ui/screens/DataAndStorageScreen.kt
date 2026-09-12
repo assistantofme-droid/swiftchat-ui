@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import com.example.ui.theme.appPalette
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -44,14 +45,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.theme.TelegramChatListBg
-import com.example.ui.theme.TelegramPrimary
-import com.example.ui.theme.TelegramSurface
-import com.example.ui.theme.TelegramTextMuted
-import com.example.ui.theme.TelegramTextPrimary
-import com.example.ui.theme.TelegramTextSecondary
 import java.io.File
-
 @Composable
 fun DataAndStorageScreen(
     autoDownloadMobile: Boolean,
@@ -71,7 +65,6 @@ fun DataAndStorageScreen(
 ) {
     val context = LocalContext.current
     var showClearCacheDialog by remember { mutableStateOf(false) }
-
     // Best-effort cache size calculation
     val cacheSizeBytes = remember {
         try {
@@ -86,9 +79,8 @@ fun DataAndStorageScreen(
     val cacheSizeFormatted = formatBytes(cacheSizeBytes)
     // Estimate data usage as 2x cache (placeholder — would need a real TrafficStats integration)
     val dataUsageFormatted = formatBytes(cacheSizeBytes * 2L)
-
     Scaffold(
-        containerColor = TelegramChatListBg,
+        containerColor = appPalette.chatListBg,
         topBar = { SettingsTopBar(title = "Data and Storage", onBack = onBack) }
     ) { padding ->
         LazyColumn(
@@ -108,21 +100,13 @@ fun DataAndStorageScreen(
                         value = cacheSizeFormatted,
                         onClick = null
                     )
-                    InfoRow(
                         icon = Icons.Default.SwapVert,
                         iconColor = Color(0xFF22C55E),
                         title = "Data Usage",
                         value = dataUsageFormatted,
-                        onClick = null
-                    )
                 }
-            }
-
             item { Spacer(modifier = Modifier.height(12.dp)) }
-
             // === Automatic media download ===
-            item {
-                SettingsCard {
                     SectionHeader("Automatic media download")
                     ToggleRow(
                         icon = Icons.Default.CloudDownload,
@@ -131,23 +115,16 @@ fun DataAndStorageScreen(
                         subtitle = "Photos, Videos (10 MB), Files (1 MB)",
                         checked = autoDownloadMobile,
                         onCheckedChange = onSetAutoDlMobile
-                    )
-                    ToggleRow(
-                        icon = Icons.Default.CloudDownload,
                         iconColor = Color(0xFF58D68D),
                         title = "When connected to Wi-Fi",
                         subtitle = "Photos, Videos (15 MB), Files (3 MB)",
                         checked = autoDownloadWifi,
                         onCheckedChange = onSetAutoDlWifi
-                    )
-                    ToggleRow(
-                        icon = Icons.Default.CloudDownload,
                         iconColor = Color(0xFFF39C12),
                         title = "When roaming",
                         subtitle = "Photos",
                         checked = autoDownloadRoaming,
                         onCheckedChange = onSetAutoDlRoaming
-                    )
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -162,73 +139,42 @@ fun DataAndStorageScreen(
                             fontWeight = FontWeight.Medium
                         )
                     }
-                }
-            }
-
-            item { Spacer(modifier = Modifier.height(12.dp)) }
-
             // === Save to Gallery ===
-            item {
-                SettingsCard {
                     SectionHeader("Save to Gallery")
-                    ToggleRow(
                         icon = Icons.Default.SaveAlt,
-                        iconColor = Color(0xFF5DADE2),
                         title = "Private Chats",
                         subtitle = if (saveGalleryPrivate) "On" else "Off",
                         checked = saveGalleryPrivate,
                         onCheckedChange = onSaveGalleryPrivate
-                    )
-                    ToggleRow(
-                        icon = Icons.Default.SaveAlt,
-                        iconColor = Color(0xFFF39C12),
                         title = "Groups",
                         subtitle = if (saveGalleryGroups) "On" else "Off",
                         checked = saveGalleryGroups,
                         onCheckedChange = onSaveGalleryGroups
-                    )
-                    ToggleRow(
-                        icon = Icons.Default.SaveAlt,
                         iconColor = Color(0xFFEC7063),
                         title = "Channels",
                         subtitle = if (saveGalleryChannels) "On" else "Off",
                         checked = saveGalleryChannels,
                         onCheckedChange = onSaveGalleryChannels
-                    )
-                }
-            }
-
-            item { Spacer(modifier = Modifier.height(12.dp)) }
-
             // === Cache management ===
-            item {
-                SettingsCard {
                     SectionHeader("Cache")
-                    InfoRow(
                         icon = Icons.Default.DeleteSweep,
                         iconColor = Color(0xFFEF4444),
                         title = "Clear Cache",
                         subtitle = "Free up space by clearing cached media ($cacheSizeFormatted)",
                         onClick = { showClearCacheDialog = true }
-                    )
-                }
-            }
-
             item { Spacer(modifier = Modifier.height(80.dp)) }
         }
-    }
-
     if (showClearCacheDialog) {
         AlertDialog(
             onDismissRequest = { showClearCacheDialog = false },
-            containerColor = TelegramSurface,
-            titleContentColor = TelegramTextPrimary,
-            title = { Text("Clear Cache?", color = TelegramTextPrimary) },
+            containerColor = appPalette.surface,
+            titleContentColor = appPalette.textPrimary,
+            title = { Text("Clear Cache?", color = appPalette.textPrimary) },
             text = {
                 Text(
                     text = "This will remove $cacheSizeFormatted of cached images and media. " +
                         "Messages and conversations are kept on the server and will re-download when you open them.",
-                    color = TelegramTextSecondary,
+                    color = appPalette.textSecondary,
                     fontSize = 14.sp
                 )
             },
@@ -238,17 +184,11 @@ fun DataAndStorageScreen(
                     showClearCacheDialog = false
                 }) {
                     Text("Clear", color = Color(0xFFEF4444), fontWeight = FontWeight.SemiBold)
-                }
-            },
             dismissButton = {
                 TextButton(onClick = { showClearCacheDialog = false }) {
-                    Text("Cancel", color = TelegramTextSecondary)
-                }
-            }
+                    Text("Cancel", color = appPalette.textSecondary)
         )
-    }
 }
-
 private fun formatBytes(bytes: Long): String {
     if (bytes <= 0) return "0 MB"
     val units = arrayOf("B", "KB", "MB", "GB")
@@ -257,7 +197,5 @@ private fun formatBytes(bytes: Long): String {
     while (size >= 1024 && unitIndex < units.size - 1) {
         size /= 1024
         unitIndex++
-    }
     return if (unitIndex >= 2) String.format("%.2f %s", size, units[unitIndex])
     else String.format("%.0f %s", size, units[unitIndex])
-}

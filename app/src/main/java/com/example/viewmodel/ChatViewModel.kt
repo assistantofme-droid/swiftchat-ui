@@ -2126,17 +2126,29 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
      * Open a private chat with the given contact by their userId.
-     * Calls GET /messages/conversations/{userId} (spec §3) to find or
-     * create the conversation, then selects it AND switches to the Chats
-     * tab so the user actually sees the chat open.
+     * Uses POST /messages/contacts — the server's dedicated "find or create
+     * private chat with this user" endpoint (addContact controller).
+     * This is more reliable than GET /messages/conversations/{id} which
+     * first tries to match by conversation _id/handle before falling back
+     * to user lookup.
+     *
+     * After getting the conversation, force-switches to the Chats tab and
+     * selects the chat so ChatDetailScreen renders immediately.
      */
     fun openPrivateChatWithContact(userId: String) {
         viewModelScope.launch {
             try {
-                val resp = ApiClient.service.getPrivateConversation(userId)
+                // POST /messages/contacts with { userId: contactUserId }
+                // Server finds/creates the private conversation and returns it.
+                val resp = ApiClient.service.startPrivateChatWithContact(
+                    AddContactRequest(userId = userId)
+                )
                 if (resp.isSuccessful && resp.body() != null) {
                     val conv = resp.body()!!
                     val chatItem = mapApiConversationToChatItem(conv)
+                    // Update chats list + switch to Chats tab in ONE state update
+                    // so the UI re-renders atomically with the chat already in
+                    // the list when ChatDetailScreen tries to find it.
                     _uiState.update { state ->
                         state.copy(
                             chats = if (state.chats.none { it.id == chatItem.id }) {
@@ -2144,14 +2156,17 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                             } else {
                                 state.chats.map { if (it.id == chatItem.id) chatItem else it }
                             },
-                            // Force-switch to Chats tab so the chat actually opens
-                            // even if the user is currently on Contacts/Settings/Profile.
-                            selectedBottomNavIndex = 0
+                            selectedBottomNavIndex = 0,
+                            selectedChatId = chatItem.id
                         )
                     }
-                    selectChat(chatItem.id)
+                    // Now fetch messages for this conversation
+                    fetchMessages(chatItem.id)
+                    startMessagePolling(chatItem.id)
+                    markConversationAsRead(chatItem.id)
                 } else {
                     val err = parseErrorBody(resp.errorBody())
+                    Log.e("ChatViewModel", "openPrivateChatWithContact failed: ${resp.code()} $err")
                     _uiState.update {
                         it.copy(networkBannerMessage = "Couldn't open chat: ${err ?: "code ${resp.code()}"}")
                     }

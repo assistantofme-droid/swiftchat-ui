@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import com.example.ui.theme.appPalette
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -46,19 +47,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.theme.TelegramChatListBg
-import com.example.ui.theme.TelegramPrimary
-import com.example.ui.theme.TelegramSurface
-import com.example.ui.theme.TelegramTextMuted
-import com.example.ui.theme.TelegramTextPrimary
-import com.example.ui.theme.TelegramTextSecondary
-
 data class ChatFolder(
     val id: String,
     val name: String,
     val isDefault: Boolean = false
 )
-
 @Composable
 fun ChatFoldersScreen(
     folders: List<ChatFolder>,
@@ -70,7 +63,6 @@ fun ChatFoldersScreen(
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
     var newFolderName by remember { mutableStateOf("") }
-
     // Recommended folders — preset suggestions the user can add in one tap
     val recommendedFolders = remember {
         listOf(
@@ -81,9 +73,8 @@ fun ChatFoldersScreen(
             ChatFolder(id = "rec_bots", name = "Bots")
         )
     }.filter { rec -> folders.none { it.name.equals(rec.name, ignoreCase = true) } }
-
     Scaffold(
-        containerColor = TelegramChatListBg,
+        containerColor = appPalette.chatListBg,
         topBar = { SettingsTopBar(title = "Chat Folders", onBack = onBack) }
     ) { padding ->
         LazyColumn(
@@ -104,26 +95,25 @@ fun ChatFoldersScreen(
                         modifier = Modifier
                             .size(96.dp)
                             .clip(RoundedCornerShape(24.dp))
-                            .background(TelegramPrimary.copy(alpha = 0.15f)),
+                            .background(appPalette.primary.copy(alpha = 0.15f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.Folder,
                             contentDescription = null,
-                            tint = TelegramPrimary,
+                            tint = appPalette.primary,
                             modifier = Modifier.size(56.dp)
                         )
                     }
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = "Create folders for different groups of chats and quickly switch between them.",
-                        color = TelegramTextSecondary,
+                        color = appPalette.textSecondary,
                         fontSize = 14.sp,
                         textAlign = TextAlign.Center
                     )
                 }
             }
-
             // === Recommended Folders ===
             if (recommendedFolders.isNotEmpty()) {
                 item {
@@ -139,53 +129,41 @@ fun ChatFoldersScreen(
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = folder.name,
-                                        color = TelegramTextPrimary,
+                                        color = appPalette.textPrimary,
                                         fontSize = 16.sp,
                                         fontWeight = FontWeight.Medium
                                     )
                                     Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
                                         text = folderDescription(folder.name),
-                                        color = TelegramTextSecondary,
+                                        color = appPalette.textSecondary,
                                         fontSize = 13.sp
-                                    )
                                 }
                                 Button(
                                     onClick = { onAddFolder(folder.name) },
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = TelegramPrimary
+                                        containerColor = appPalette.primary
                                     ),
                                     shape = RoundedCornerShape(20.dp),
                                     contentPadding = androidx.compose.foundation.layout.PaddingValues(
                                         horizontal = 20.dp,
                                         vertical = 6.dp
-                                    )
                                 ) {
-                                    Text(
                                         text = "Add",
                                         color = Color.White,
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Bold
-                                    )
-                                }
                             }
                         }
-                    }
-                }
                 item { Spacer(modifier = Modifier.height(12.dp)) }
-            }
-
             // === Custom folders ===
-            item {
                 SettingsCard {
                     SectionHeader("Your Folders")
                     if (folders.isEmpty()) {
                         Text(
                             text = "No folders yet. Create one to organize your chats.",
-                            color = TelegramTextSecondary,
+                            color = appPalette.textSecondary,
                             fontSize = 14.sp,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)
-                        )
                     } else {
                         folders.forEachIndexed { index, folder ->
                             FolderRow(
@@ -198,56 +176,33 @@ fun ChatFoldersScreen(
                                         .fillMaxWidth()
                                         .padding(horizontal = 16.dp)
                                         .height(0.5.dp)
-                                        .background(TelegramTextMuted.copy(alpha = 0.2f))
+                                        .background(appPalette.textMuted.copy(alpha = 0.2f))
                                 )
-                            }
-                        }
-                    }
                     // Create new folder row
                     Row(
-                        modifier = Modifier
                             .fillMaxWidth()
                             .clickable { showCreateDialog = true }
                             .padding(horizontal = 16.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
                             imageVector = Icons.Default.Add,
-                            contentDescription = null,
-                            tint = TelegramPrimary,
                             modifier = Modifier.size(24.dp)
-                        )
                         Spacer(modifier = Modifier.width(16.dp))
-                        Text(
                             text = "Create New Folder",
-                            color = TelegramPrimary,
+                            color = appPalette.primary,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-            }
-
             item { Spacer(modifier = Modifier.height(12.dp)) }
-
             // === Show Folder Tags toggle ===
-            item {
-                SettingsCard {
                     ToggleRow(
                         icon = Icons.Default.Folder,
-                        iconColor = TelegramPrimary,
+                        iconColor = appPalette.primary,
                         title = "Show Folder Tags",
                         subtitle = "Display folder names for each chat in the chat list",
                         checked = showFolderTags,
                         onCheckedChange = onToggleFolderTags
-                    )
-                }
-            }
-
             item { Spacer(modifier = Modifier.height(80.dp)) }
         }
     }
-
     // Create folder dialog
     if (showCreateDialog) {
         AlertDialog(
@@ -255,51 +210,39 @@ fun ChatFoldersScreen(
                 showCreateDialog = false
                 newFolderName = ""
             },
-            containerColor = TelegramSurface,
-            titleContentColor = TelegramTextPrimary,
-            title = { Text("New Folder", color = TelegramTextPrimary) },
+            containerColor = appPalette.surface,
+            titleContentColor = appPalette.textPrimary,
+            title = { Text("New Folder", color = appPalette.textPrimary) },
             text = {
                 OutlinedTextField(
                     value = newFolderName,
                     onValueChange = { newFolderName = it.take(32) },
-                    placeholder = { Text("Folder name", color = TelegramTextMuted) },
+                    placeholder = { Text("Folder name", color = appPalette.textMuted) },
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = TelegramPrimary,
-                        unfocusedBorderColor = TelegramTextMuted.copy(alpha = 0.3f),
-                        focusedTextColor = TelegramTextPrimary,
-                        unfocusedTextColor = TelegramTextPrimary,
-                        cursorColor = TelegramPrimary
+                        focusedBorderColor = appPalette.primary,
+                        unfocusedBorderColor = appPalette.textMuted.copy(alpha = 0.3f),
+                        focusedTextColor = appPalette.textPrimary,
+                        unfocusedTextColor = appPalette.textPrimary,
+                        cursorColor = appPalette.primary
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )
-            },
             confirmButton = {
                 TextButton(
                     onClick = {
                         if (newFolderName.isNotBlank()) {
                             onAddFolder(newFolderName.trim())
                             newFolderName = ""
-                        }
                         showCreateDialog = false
-                    }
-                ) {
-                    Text("Create", color = TelegramPrimary, fontWeight = FontWeight.SemiBold)
-                }
-            },
+                    Text("Create", color = appPalette.primary, fontWeight = FontWeight.SemiBold)
             dismissButton = {
                 TextButton(onClick = {
                     showCreateDialog = false
                     newFolderName = ""
                 }) {
-                    Text("Cancel", color = TelegramTextSecondary)
-                }
-            }
-        )
-    }
+                    Text("Cancel", color = appPalette.textSecondary)
 }
-
-@Composable
 private fun FolderRow(folder: ChatFolder, onDelete: () -> Unit) {
     Row(
         modifier = Modifier
@@ -310,28 +253,20 @@ private fun FolderRow(folder: ChatFolder, onDelete: () -> Unit) {
         Icon(
             imageVector = Icons.Default.DragHandle,
             contentDescription = "Drag",
-            tint = TelegramTextMuted,
+            tint = appPalette.textMuted,
             modifier = Modifier.size(24.dp)
-        )
         Spacer(modifier = Modifier.width(16.dp))
         Text(
             text = folder.name,
-            color = TelegramTextPrimary,
+            color = appPalette.textPrimary,
             fontSize = 16.sp,
             fontWeight = FontWeight.Medium,
             modifier = Modifier.weight(1f)
-        )
-        Icon(
             imageVector = Icons.Default.MoreVert,
             contentDescription = "More",
-            tint = TelegramTextSecondary,
-            modifier = Modifier
+            tint = appPalette.textSecondary,
                 .size(24.dp)
                 .clickable(onClick = onDelete)
-        )
-    }
-}
-
 private fun folderDescription(name: String): String = when {
     name.equals("Unread", ignoreCase = true) -> "New messages from all chats."
     name.equals("Personal", ignoreCase = true) -> "One-on-one private conversations."
@@ -339,4 +274,3 @@ private fun folderDescription(name: String): String = when {
     name.equals("Channels", ignoreCase = true) -> "Channels you're subscribed to."
     name.equals("Bots", ignoreCase = true) -> "Conversations with bots."
     else -> "Custom folder"
-}

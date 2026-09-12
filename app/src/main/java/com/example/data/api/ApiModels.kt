@@ -98,7 +98,8 @@ data class UpdateProfileRequest(
 
 @JsonClass(generateAdapter = true)
 data class AddContactRequest(
-    @Json(name = "identifier") val identifier: String
+    @Json(name = "identifier") val identifier: String? = null,
+    @Json(name = "userId") val userId: String? = null
 )
 
 @JsonClass(generateAdapter = true)

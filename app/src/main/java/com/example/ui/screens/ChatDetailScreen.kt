@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import com.example.ui.theme.appPalette
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -84,14 +85,6 @@ import com.example.ui.components.UserProfileData
 import com.example.ui.components.UserProfileModal
 import com.example.ui.components.VideoPlayerDialog
 import com.example.ui.media.AudioPlayerManager
-import com.example.ui.theme.TelegramDarkBg
-import com.example.ui.theme.TelegramGlassBorder
-import com.example.ui.theme.TelegramGlassHeader
-import com.example.ui.theme.TelegramGlassInput
-import com.example.ui.theme.TelegramPrimary
-import com.example.ui.theme.TelegramSendFabGradient
-import com.example.ui.theme.TelegramTextPrimary
-import com.example.ui.theme.TelegramTextSecondary
 import kotlinx.coroutines.launch
 
 @Composable
@@ -181,7 +174,7 @@ fun ChatDetailScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(TelegramDarkBg)
+            .background(appPalette.bg)
     ) {
         // High-end ambient glass canvas background with glowing light orbs
         TelegramGlassBackground()
@@ -191,8 +184,8 @@ fun ChatDetailScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(TelegramGlassHeader)
-                    .border(0.8.dp, TelegramGlassBorder)
+                    .background(appPalette.glassHeader)
+                    .border(0.8.dp, appPalette.glassBorder)
                     .statusBarsPadding()
             ) {
                 Row(
@@ -225,7 +218,7 @@ fun ChatDetailScreen(
                                     .size(11.dp)
                                     .clip(CircleShape)
                                     .background(Color(0xFF00E676))
-                                    .border(1.5.dp, TelegramDarkBg, CircleShape)
+                                    .border(1.5.dp, appPalette.bg, CircleShape)
                                     .align(Alignment.BottomEnd)
                             )
                         }
@@ -241,7 +234,7 @@ fun ChatDetailScreen(
                     ) {
                         Text(
                             text = chat.title,
-                            color = TelegramTextPrimary,
+                            color = appPalette.textPrimary,
                             fontSize = 16.5.sp,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
@@ -249,7 +242,7 @@ fun ChatDetailScreen(
                         )
                         Text(
                             text = if (chat.isGroup) "44 members, 12 online" else if (chat.isTyping) "typing..." else "online",
-                            color = if (chat.isTyping) TelegramPrimary else Color(0xFF5AB4F8),
+                            color = if (chat.isTyping) appPalette.primary else Color(0xFF5AB4F8),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium
                         )
@@ -260,7 +253,7 @@ fun ChatDetailScreen(
                         Icon(
                             imageVector = Icons.Default.Call,
                             contentDescription = "Voice Call",
-                            tint = TelegramTextSecondary,
+                            tint = appPalette.textSecondary,
                             modifier = Modifier.size(22.dp)
                         )
                     }
@@ -270,7 +263,7 @@ fun ChatDetailScreen(
                         Icon(
                             imageVector = Icons.Default.Videocam,
                             contentDescription = "Video Call",
-                            tint = TelegramTextSecondary,
+                            tint = appPalette.textSecondary,
                             modifier = Modifier.size(23.dp)
                         )
                     }
@@ -280,7 +273,7 @@ fun ChatDetailScreen(
                         Icon(
                             imageVector = Icons.Default.MoreVert,
                             contentDescription = "Options",
-                            tint = TelegramTextSecondary,
+                            tint = appPalette.textSecondary,
                             modifier = Modifier.size(22.dp)
                         )
                     }
@@ -314,7 +307,7 @@ fun ChatDetailScreen(
                                 .width(2.5.dp)
                                 .height(28.dp)
                                 .clip(RoundedCornerShape(2.dp))
-                                .background(TelegramPrimary)
+                                .background(appPalette.primary)
                         )
 
                         Spacer(modifier = Modifier.width(10.dp))
@@ -322,7 +315,7 @@ fun ChatDetailScreen(
                         Icon(
                             imageVector = Icons.Default.PushPin,
                             contentDescription = "Pinned",
-                            tint = TelegramPrimary,
+                            tint = appPalette.primary,
                             modifier = Modifier.size(16.dp)
                         )
 
@@ -331,13 +324,13 @@ fun ChatDetailScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Pinned Message",
-                                color = TelegramPrimary,
+                                color = appPalette.primary,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
                                 text = messages.firstOrNull()?.text ?: "Welcome to Telegram",
-                                color = TelegramTextSecondary,
+                                color = appPalette.textSecondary,
                                 fontSize = 12.sp,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -351,7 +344,7 @@ fun ChatDetailScreen(
                             Icon(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = "Unpin",
-                                tint = TelegramTextSecondary,
+                                tint = appPalette.textSecondary,
                                 modifier = Modifier.size(14.dp)
                             )
                         }
@@ -399,7 +392,7 @@ fun ChatDetailScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(Color(0xE017212B))
-                        .border(0.5.dp, TelegramGlassBorder)
+                        .border(0.5.dp, appPalette.glassBorder)
                         .padding(horizontal = 14.dp, vertical = 6.dp)
                 ) {
                     Row(
@@ -411,7 +404,7 @@ fun ChatDetailScreen(
                                 .width(3.dp)
                                 .height(32.dp)
                                 .clip(RoundedCornerShape(2.dp))
-                                .background(TelegramPrimary)
+                                .background(appPalette.primary)
                         )
 
                         Spacer(modifier = Modifier.width(10.dp))
@@ -419,13 +412,13 @@ fun ChatDetailScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = if (editingMessage != null) "Edit Message" else "Reply to ${replyingMessage?.senderName ?: "User"}",
-                                color = TelegramPrimary,
+                                color = appPalette.primary,
                                 fontSize = 12.5.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
                                 text = (if (editingMessage != null) editingMessage?.text else replyingMessage?.text) ?: "Media",
-                                color = TelegramTextSecondary,
+                                color = appPalette.textSecondary,
                                 fontSize = 12.sp,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -445,7 +438,7 @@ fun ChatDetailScreen(
                             Icon(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = "Cancel",
-                                tint = TelegramTextSecondary,
+                                tint = appPalette.textSecondary,
                                 modifier = Modifier.size(16.dp)
                             )
                         }
@@ -471,7 +464,7 @@ fun ChatDetailScreen(
                             .shadow(6.dp, RoundedCornerShape(26.dp), spotColor = Color(0x66000000))
                             .clip(RoundedCornerShape(26.dp))
                             .background(TelegramGlassInput)
-                            .border(1.dp, TelegramGlassBorder, RoundedCornerShape(26.dp))
+                            .border(1.dp, appPalette.glassBorder, RoundedCornerShape(26.dp))
                             .padding(horizontal = 6.dp, vertical = 3.dp)
                     ) {
                         Row(
@@ -493,7 +486,7 @@ fun ChatDetailScreen(
                                 Icon(
                                     imageVector = Icons.Default.SentimentSatisfiedAlt,
                                     contentDescription = "Emoji & Stickers",
-                                    tint = if (isStickerSheetOpen) TelegramPrimary else TelegramTextSecondary,
+                                    tint = if (isStickerSheetOpen) appPalette.primary else appPalette.textSecondary,
                                     modifier = Modifier.size(24.dp)
                                 )
                             }
@@ -505,7 +498,7 @@ fun ChatDetailScreen(
                                 placeholder = {
                                     Text(
                                         text = if (editingMessage != null) "Edit message..." else "Message",
-                                        color = TelegramTextSecondary,
+                                        color = appPalette.textSecondary,
                                         fontSize = 16.sp
                                     )
                                 },
@@ -513,11 +506,11 @@ fun ChatDetailScreen(
                                     focusedContainerColor = Color.Transparent,
                                     unfocusedContainerColor = Color.Transparent,
                                     disabledContainerColor = Color.Transparent,
-                                    cursorColor = TelegramPrimary,
+                                    cursorColor = appPalette.primary,
                                     focusedIndicatorColor = Color.Transparent,
                                     unfocusedIndicatorColor = Color.Transparent,
-                                    focusedTextColor = TelegramTextPrimary,
-                                    unfocusedTextColor = TelegramTextPrimary
+                                    focusedTextColor = appPalette.textPrimary,
+                                    unfocusedTextColor = appPalette.textPrimary
                                 ),
                                 modifier = Modifier.weight(1f)
                             )
@@ -537,7 +530,7 @@ fun ChatDetailScreen(
                                 Icon(
                                     imageVector = Icons.Default.AttachFile,
                                     contentDescription = "Attach / سنجاق",
-                                    tint = if (isAttachmentSheetOpen) TelegramPrimary else TelegramTextSecondary,
+                                    tint = if (isAttachmentSheetOpen) appPalette.primary else appPalette.textSecondary,
                                     modifier = Modifier.size(23.dp)
                                 )
                             }

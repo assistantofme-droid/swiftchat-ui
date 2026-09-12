@@ -43,13 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.api.ApiSession
-import com.example.ui.theme.TelegramChatListBg
-import com.example.ui.theme.TelegramPrimary
-import com.example.ui.theme.TelegramSurface
-import com.example.ui.theme.TelegramTextMuted
-import com.example.ui.theme.TelegramTextPrimary
-import com.example.ui.theme.TelegramTextSecondary
-
+import com.example.ui.theme.appPalette
 @Composable
 fun DevicesScreen(
     sessions: List<ApiSession>,
@@ -60,9 +54,8 @@ fun DevicesScreen(
     onBack: () -> Unit
 ) {
     var showLogoutAllDialog by remember { mutableStateOf(false) }
-
     Scaffold(
-        containerColor = TelegramChatListBg,
+        containerColor = appPalette.chatListBg,
         topBar = { SettingsTopBar(title = "Devices", onBack = onBack) }
     ) { padding ->
         LazyColumn(
@@ -92,12 +85,8 @@ fun DevicesScreen(
                     )
                 }
             }
-
             item { Spacer(modifier = Modifier.height(12.dp)) }
-
             // === Active sessions on other devices ===
-            item {
-                SettingsCard {
                     SectionHeader("Active Sessions")
                     when {
                         isLoading && sessions.isEmpty() -> {
@@ -107,49 +96,34 @@ fun DevicesScreen(
                                     .padding(24.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                CircularProgressIndicator(color = TelegramPrimary)
+                                CircularProgressIndicator(color = appPalette.primary)
                             }
                         }
                         errorMessage != null && sessions.isEmpty() -> {
                             Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
                                     .padding(16.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
                                 Text(
                                     text = errorMessage,
-                                    color = TelegramTextSecondary,
+                                    color = appPalette.textSecondary,
                                     fontSize = 13.sp
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
                                 TextButton(onClick = onLaunchLoad) {
-                                    Text("Retry", color = TelegramPrimary)
+                                    Text("Retry", color = appPalette.primary)
                                 }
-                            }
-                        }
                         sessions.none { it.current != true } -> {
                             Text(
                                 text = "No other active sessions.",
-                                color = TelegramTextSecondary,
+                                color = appPalette.textSecondary,
                                 fontSize = 14.sp,
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)
                             )
-                        }
                         else -> {
                             sessions.filter { it.current != true }.forEach { session ->
                                 SessionRow(session = session, isCurrent = false)
-                            }
-                        }
                     }
-                }
-            }
-
-            item { Spacer(modifier = Modifier.height(12.dp)) }
-
             // === Logout all others ===
-            item {
-                SettingsCard {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -169,26 +143,20 @@ fun DevicesScreen(
                             color = Color(0xFFEF4444),
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-            }
-
             item { Spacer(modifier = Modifier.height(80.dp)) }
         }
     }
-
     if (showLogoutAllDialog) {
         AlertDialog(
             onDismissRequest = { showLogoutAllDialog = false },
-            containerColor = TelegramSurface,
-            titleContentColor = TelegramTextPrimary,
-            title = { Text("Log out all other devices?", color = TelegramTextPrimary) },
+            containerColor = appPalette.surface,
+            titleContentColor = appPalette.textPrimary,
+            title = { Text("Log out all other devices?", color = appPalette.textPrimary) },
             text = {
                 Text(
                     text = "This will end all other active sessions on your account. " +
                         "You'll stay logged in on this device.",
-                    color = TelegramTextSecondary,
+                    color = appPalette.textSecondary,
                     fontSize = 14.sp
                 )
             },
@@ -200,21 +168,13 @@ fun DevicesScreen(
                     },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xFFEF4444)
-                    )
                 ) {
                     Text("Log Out All", color = Color.White)
-                }
-            },
             dismissButton = {
                 TextButton(onClick = { showLogoutAllDialog = false }) {
-                    Text("Cancel", color = TelegramTextSecondary)
-                }
-            }
+                    Text("Cancel", color = appPalette.textSecondary)
         )
-    }
 }
-
-@Composable
 private fun SessionRow(session: ApiSession, isCurrent: Boolean) {
     Row(
         modifier = Modifier
@@ -227,56 +187,41 @@ private fun SessionRow(session: ApiSession, isCurrent: Boolean) {
             "android" -> Icons.Default.PhoneAndroid
             "web" -> Icons.Default.Computer
             else -> Icons.Default.Devices
-        }
         Box(
-            modifier = Modifier
                 .size(40.dp)
                 .clip(RoundedCornerShape(14.dp))
-                .background(TelegramPrimary.copy(alpha = 0.15f)),
+                .background(appPalette.primary.copy(alpha = 0.15f)),
             contentAlignment = Alignment.Center
-        ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = TelegramPrimary,
+                tint = appPalette.primary,
                 modifier = Modifier.size(22.dp)
             )
-        }
         Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = session.deviceInfo?.deviceName ?: "Unknown device",
-                color = TelegramTextPrimary,
+                color = appPalette.textPrimary,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium
-            )
             Spacer(modifier = Modifier.height(2.dp))
             val subtitle = buildString {
                 session.deviceInfo?.platform?.let { append(it.replaceFirstChar { c -> c.uppercase() }) }
                 session.deviceInfo?.appVersion?.let { if (isNotEmpty()) append(" • ") ; append("v$it") }
                 session.ipAddress?.let { if (isNotEmpty()) append(" • ") ; append(it) }
                 if (isEmpty()) append(if (isCurrent) "Current session" else "Last active recently")
-            }
-            Text(
                 text = subtitle,
-                color = TelegramTextSecondary,
+                color = appPalette.textSecondary,
                 fontSize = 13.sp
-            )
-        }
         if (isCurrent) {
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(10.dp))
-                    .background(TelegramPrimary.copy(alpha = 0.15f))
+                    .background(appPalette.primary.copy(alpha = 0.15f))
                     .padding(horizontal = 8.dp, vertical = 2.dp)
             ) {
-                Text(
                     text = "CURRENT",
-                    color = TelegramPrimary,
+                    color = appPalette.primary,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold
-                )
-            }
-        }
-    }
-}

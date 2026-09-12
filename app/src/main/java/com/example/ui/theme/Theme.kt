@@ -4,6 +4,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 
 // ============================================================
@@ -25,7 +26,6 @@ private val TelegramDarkColorScheme = darkColorScheme(
 
 // ============================================================
 // Light palette — uses the public Light* colors defined in Color.kt
-// (no private re-declaration, which caused overload-resolution ambiguity)
 // ============================================================
 private val TelegramLightColorScheme = lightColorScheme(
     primary = LightPrimary,
@@ -47,9 +47,13 @@ fun MyApplicationTheme(
     content: @Composable () -> Unit
 ) {
     val colorScheme = if (isDarkMode) TelegramDarkColorScheme else TelegramLightColorScheme
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+    val palette = if (isDarkMode) DarkPalette else LightPalette
+
+    CompositionLocalProvider(LocalAppPalette provides palette) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
+    }
 }
