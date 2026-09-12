@@ -389,7 +389,7 @@ private fun ChannelCard(channel: ApiConversation) {
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
-                        text = "${channel.participants?.size ?: 0} subscribers",
+                        text = "${channel.participantsCount} subscribers",
                         color = appPalette.primary,
                         fontSize = 11.sp,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
@@ -422,7 +422,7 @@ private fun ChannelCard(channel: ApiConversation) {
                         )
                     }
                 }
-                channel.lastMessage?.createdAt?.let {
+                channel.lastMessageCreatedAt?.let {
                     Text(
                         text = formatDateShort(it),
                         color = appPalette.textSecondary,

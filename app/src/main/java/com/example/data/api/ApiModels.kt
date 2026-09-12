@@ -93,7 +93,8 @@ data class UpdateProfileRequest(
     @Json(name = "avatars") val avatars: List<String>? = null,
     @Json(name = "profileColor") val profileColor: String? = null,
     @Json(name = "birthday") val birthday: String? = null,
-    @Json(name = "isPhoneHidden") val isPhoneHidden: Boolean? = null
+    @Json(name = "isPhoneHidden") val isPhoneHidden: Boolean? = null,
+    @Json(name = "settings") val settings: Map<String, Any?>? = null
 )
 
 @JsonClass(generateAdapter = true)
@@ -150,23 +151,38 @@ data class ApiConversation(
     @Json(name = "description") val description: String? = null,
     @Json(name = "avatar") val avatar: String? = null,
     @Json(name = "handle") val handle: String? = null,
-    @Json(name = "participants") val participants: List<ApiUser>? = emptyList(),
-    @Json(name = "owner") val owner: ApiUser? = null,
-    @Json(name = "admins") val admins: List<ApiUser>? = emptyList(),
-    @Json(name = "lastMessage") val lastMessage: ApiLastMessage? = null,
-    // NOTE: unreadCount is intentionally OMITTED. The server stores it as a
-    // Mongoose Map<string, number> which serializes to a JSON object.
-    // @JsonClass(generateAdapter = true) cannot reliably handle Any? or
-    // Map<String, Any?>? for this field — it causes silent parse failures
-    // that make resp.body() return null, breaking ALL conversation endpoints.
-    // Moshi simply skips undeclared JSON fields, so omitting it is the
-    // safest approach. We default to 0 in the mapping layer.
+    // Server can return participants as List<ApiUser>, List<String> (ObjectIds),
+    // or List<{user: ApiUser/String, role: ...}>. Any? prevents Moshi parsing failure.
+    @Json(name = "participants") val participants: Any? = null,
+    // Server can return owner as String (ObjectId) or ApiUser object.
+    @Json(name = "owner") val owner: Any? = null,
+    // Server can return admins as List<String> (ObjectIds) or List<ApiUser>.
+    @Json(name = "admins") val admins: Any? = null,
+    // Server can return lastMessage as String (ObjectId) or ApiLastMessage object.
+    @Json(name = "lastMessage") val lastMessage: Any? = null,
+    // Server can return unreadCount as Int, Map<String, Int>, or List.
+    @Json(name = "unreadCount") val unreadCount: Any? = null,
     @Json(name = "isMuted") val isMuted: Boolean? = false,
     @Json(name = "pinned") val pinned: Boolean? = false,
     @Json(name = "lastMessageAt") val lastMessageAt: String? = null,
     @Json(name = "isChannel") val isChannel: Boolean? = false,
-    @Json(name = "isVerified") val isVerified: Boolean? = false
-)
+    @Json(name = "isVerified") val isVerified: Boolean? = false,
+    @Json(name = "deletedBy") val deletedBy: List<String>? = null,
+    @Json(name = "mutedBy") val mutedBy: List<String>? = null
+) {
+    val participantsCount: Int
+        get() = when (val p = participants) {
+            is List<*> -> p.size
+            is Number -> p.toInt()
+            else -> 0
+        }
+
+    val lastMessageCreatedAt: String?
+        get() = when (val lm = lastMessage) {
+            is Map<*, *> -> (lm["createdAt"] ?: lm["updatedAt"]) as? String
+            else -> lastMessageAt
+        }
+}
 
 @JsonClass(generateAdapter = true)
 data class CreateConversationRequest(

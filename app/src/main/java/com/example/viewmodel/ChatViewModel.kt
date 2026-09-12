@@ -254,7 +254,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 if (resp.isSuccessful && !resp.body().isNullOrEmpty()) {
                     val channel = resp.body()!!.firstOrNull {
                         (it.isChannel == true || it.type == "channel") &&
-                                (it.owner?._id == userId)
+                                (extractUserId(it.owner) == userId)
                     }
                     _uiState.update { it.copy(myChannel = channel) }
                 }
@@ -646,6 +646,59 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // =============================================================
+    // Extraction Helpers for Flexible API Responses
+    // =============================================================
+
+    private fun extractUserMap(item: Any?): Map<String, Any?>? {
+        if (item == null) return null
+        if (item is Map<*, *>) {
+            @Suppress("UNCHECKED_CAST")
+            val map = item as Map<String, Any?>
+            val nestedUser = map["user"]
+            if (nestedUser is Map<*, *>) {
+                @Suppress("UNCHECKED_CAST")
+                return nestedUser as Map<String, Any?>
+            }
+            return map
+        }
+        return null
+    }
+
+    private fun extractUserId(item: Any?): String? {
+        if (item == null) return null
+        if (item is String) return item
+        if (item is Map<*, *>) {
+            val m = extractUserMap(item) ?: return null
+            return (m["_id"] ?: m["id"]) as? String
+        }
+        return null
+    }
+
+    private fun extractUserName(item: Any?): String? {
+        if (item is Map<*, *>) {
+            val m = extractUserMap(item) ?: return null
+            return (m["name"] ?: m["username"] ?: m["phone"]) as? String
+        }
+        return null
+    }
+
+    private fun extractUserAvatar(item: Any?): String? {
+        if (item is Map<*, *>) {
+            val m = extractUserMap(item) ?: return null
+            return m["avatar"] as? String
+        }
+        return null
+    }
+
+    private fun extractParticipantsList(raw: Any?): List<Any> {
+        if (raw == null) return emptyList()
+        if (raw is List<*>) {
+            return raw.filterNotNull()
+        }
+        return emptyList()
+    }
+
+    // =============================================================
     // Conversations API
     // =============================================================
 
@@ -653,36 +706,52 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(isRefreshing = true, networkBannerMessage = null) }
         viewModelScope.launch {
             try {
-                // Prefer /messages/conversations (which is the per-user list with lastMessage);
-                // fall back to /conversations if the server only has the latter mounted.
-                val response = try {
+                val conversations = mutableListOf<ApiConversation>()
+
+                // Try fetching conversations from /messages/conversations first
+                try {
                     val r1 = ApiClient.service.getConversationsAlt()
-                    if (r1.isSuccessful && !r1.body().isNullOrEmpty()) r1
-                    else ApiClient.service.getConversations()
+                    if (r1.isSuccessful && !r1.body().isNullOrEmpty()) {
+                        conversations.addAll(r1.body()!!)
+                    }
                 } catch (e: Exception) {
-                    ApiClient.service.getConversations()
+                    Log.d("ChatViewModel", "getConversationsAlt error: ${e.message}")
                 }
 
-                if (response.isSuccessful && !response.body().isNullOrEmpty()) {
-                    val apiConversations = response.body()!!
-                    val mappedChats = apiConversations.map { mapApiConversationToChatItem(it) }
+                // If empty or as complement, fetch from /conversations
+                try {
+                    val r2 = ApiClient.service.getConversations()
+                    if (r2.isSuccessful && !r2.body().isNullOrEmpty()) {
+                        val body = r2.body()!!
+                        for (conv in body) {
+                            if (conversations.none { it._id == conv._id }) {
+                                conversations.add(conv)
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.d("ChatViewModel", "getConversations error: ${e.message}")
+                }
 
-                    _uiState.update { state ->
-                        state.copy(
-                            chats = mappedChats,
-                            isRefreshing = false,
-                            networkBannerMessage = null
-                        )
+                // Also try saved messages
+                try {
+                    val savedResp = ApiClient.service.getSavedMessagesConversation()
+                    if (savedResp.isSuccessful && savedResp.body() != null) {
+                        val saved = savedResp.body()!!
+                        if (conversations.none { it._id == saved._id }) {
+                            conversations.add(0, saved)
+                        }
                     }
-                } else {
-                    val code = response.code()
-                    _uiState.update { state ->
-                        state.copy(
-                            isRefreshing = false,
-                            networkBannerMessage = if (state.chats.isEmpty())
-                                "No conversations yet (${code})" else null
-                        )
-                    }
+                } catch (_: Exception) {}
+
+                val mappedChats = conversations.distinctBy { it._id }.map { mapApiConversationToChatItem(it) }
+
+                _uiState.update { state ->
+                    state.copy(
+                        chats = mappedChats,
+                        isRefreshing = false,
+                        networkBannerMessage = null
+                    )
                 }
             } catch (e: Exception) {
                 Log.e("ChatViewModel", "refreshConversations error", e)
@@ -704,11 +773,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 delay(12000) // Poll every 12 seconds
                 if (_uiState.value.selectedChatId == null && _uiState.value.isAuthenticated) {
                     try {
-                        val resp = ApiClient.service.getConversationsAlt()
+                        val resp = try {
+                            ApiClient.service.getConversationsAlt()
+                        } catch (_: Exception) {
+                            ApiClient.service.getConversations()
+                        }
                         val body = if (resp.isSuccessful) resp.body() else null
                         if (!body.isNullOrEmpty()) {
                             val mapped = body.map { mapApiConversationToChatItem(it) }
-                            _uiState.update { it.copy(chats = mapped) }
+                            _uiState.update { state ->
+                                val localOnly = state.chats.filter { local -> mapped.none { it.id == local.id } }
+                                state.copy(chats = mapped + localOnly)
+                            }
                         }
                     } catch (_: Exception) {
                         // silent — network blips during polling shouldn't toast
@@ -720,30 +796,61 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun mapApiConversationToChatItem(apiConv: ApiConversation): ChatItem {
         val currentUserId = sessionManager.userId
-        // Server returns participants as a flat List<ApiUser> (per
-        // /src/controllers/messageController.ts → populate('participants', ...)).
-        val otherParticipant = apiConv.participants?.firstOrNull { it._id != currentUserId }
+        val rawParticipants = extractParticipantsList(apiConv.participants)
 
+        val otherParticipantRaw = rawParticipants.firstOrNull { extractUserId(it) != currentUserId }
+        val otherName = extractUserName(otherParticipantRaw)
+        val otherAvatar = extractUserAvatar(otherParticipantRaw)
+
+        val (lmText, lmTime) = when (val lm = apiConv.lastMessage) {
+            is Map<*, *> -> {
+                val text = (lm["text"] ?: lm["caption"] ?: lm["content"]) as? String
+                val time = (lm["createdAt"] ?: lm["updatedAt"]) as? String
+                Pair(text, time)
+            }
+            is String -> Pair(null, null)
+            else -> Pair(null, null)
+        }
+
+        val isChannel = apiConv.isChannel == true || apiConv.type == "channel"
+        val isGroup = apiConv.type == "group" || (apiConv.type != "private" && apiConv.type != "saved" && rawParticipants.size > 2)
+
+        val isPersian = _uiState.value.language == "fa"
         val title = when {
             !apiConv.name.isNullOrBlank() -> apiConv.name
-            !otherParticipant?.name.isNullOrBlank() -> otherParticipant?.name!!
-            !otherParticipant?.username.isNullOrBlank() -> otherParticipant?.username!!
-            apiConv.type == "saved" -> "Saved Messages"
+            !otherName.isNullOrBlank() -> otherName
+            apiConv.type == "saved" -> if (isPersian) "پیام‌های ذخیره شده" else "Saved Messages"
+            isChannel -> if (isPersian) "کانال" else "Channel"
+            isGroup -> if (isPersian) "گروه" else "Group"
             else -> "7eve9Chat User"
         }
 
         val avatar = ApiClient.resolveUrl(
-            apiConv.avatar ?: otherParticipant?.avatar
+            apiConv.avatar ?: otherAvatar
         )
-        val subtitle = apiConv.lastMessage?.text ?: "No messages yet"
-        val time = formatApiTime(apiConv.lastMessage?.createdAt ?: apiConv.lastMessageAt)
-        // unreadCount is omitted from the model (server returns it as a Map
-        // which Moshi can't reliably parse). Default to 0.
-        val unread = 0
-        val isMuted = apiConv.isMuted == true
+        val subtitle = when {
+            !lmText.isNullOrBlank() -> lmText
+            isChannel -> if (isPersian) "کانال" else "Channel"
+            isGroup -> if (isPersian) "گروه" else "Group"
+            else -> if (isPersian) "هنوز پیامی نیست" else "No messages yet"
+        }
+        val time = formatApiTime(lmTime ?: apiConv.lastMessageAt)
+
+        // unreadCount can be either a plain Int or Map<userId, count>
+        val unread = when (val uc = apiConv.unreadCount) {
+            is Number -> uc.toInt()
+            is Map<*, *> -> {
+                val key = currentUserId ?: ""
+                (uc[key] as? Number)?.toInt() ?: 0
+            }
+            is List<*> -> (uc.firstOrNull() as? Number)?.toInt() ?: 0
+            else -> 0
+        }
+
+        val isMuted = apiConv.isMuted == true ||
+            (apiConv.mutedBy?.contains(currentUserId) == true)
+
         val isPinned = apiConv.pinned == true
-        val isGroup = apiConv.type != "private" && apiConv.type != "saved" && (apiConv.participants?.size ?: 0) > 2
-        val isChannel = apiConv.isChannel == true || apiConv.type == "channel"
 
         return ChatItem(
             id = apiConv._id,
@@ -756,8 +863,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             avatarUrl = avatar,
             avatarType = AvatarType.MOTORCYCLE,
             isGroup = isGroup,
-            memberCount = apiConv.participants?.size ?: 0,
-            isOnline = otherParticipant?.let { isUserOnline(it) } ?: false
+            isChannel = isChannel,
+            memberCount = rawParticipants.size,
+            isOnline = false
         )
     }
 
@@ -1582,9 +1690,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 val convResp = ApiClient.service.getConversation(targetId ?: return@launch)
                 if (!convResp.isSuccessful || convResp.body() == null) return@launch
                 val conv = convResp.body()!!
-                // Server returns participants as a flat List<ApiUser>.
-                val other = conv.participants?.firstOrNull { it._id != sessionManager.userId }
-                val otherUserId = other?._id ?: return@launch
+                // Server returns participants in flexible formats
+                val otherUserId = extractParticipantsList(conv.participants)
+                    .mapNotNull { extractUserId(it) }
+                    .firstOrNull { it != sessionManager.userId } ?: return@launch
 
                 val userResp = ApiClient.service.getUser(otherUserId)
                 if (userResp.isSuccessful && userResp.body() != null) {

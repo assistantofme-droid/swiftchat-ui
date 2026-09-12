@@ -59,6 +59,7 @@ fun TelegramBottomNav(
     modifier: Modifier = Modifier
 ) {
     val palette = appPalette
+    val strings = com.example.ui.locale.LocalAppStrings.current
 
     Surface(
         color = palette.glassHeader.copy(alpha = 0.92f),
@@ -81,7 +82,7 @@ fun TelegramBottomNav(
                     Box {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.Chat,
-                            contentDescription = "Chats",
+                            contentDescription = strings.navChats,
                             modifier = Modifier.size(24.dp)
                         )
                         chatsBadgeCount?.takeIf { it > 0 }?.let { count ->
@@ -101,7 +102,7 @@ fun TelegramBottomNav(
                         }
                     }
                 },
-                label = "Chats",
+                label = strings.navChats,
                 isSelected = selectedIndex == 0,
                 onClick = { onSelect(0) }
             )
@@ -111,11 +112,11 @@ fun TelegramBottomNav(
                 icon = {
                     Icon(
                         imageVector = Icons.Default.People,
-                        contentDescription = "Contacts",
+                        contentDescription = strings.navContacts,
                         modifier = Modifier.size(24.dp)
                     )
                 },
-                label = "Contacts",
+                label = strings.navContacts,
                 isSelected = selectedIndex == 1,
                 onClick = { onSelect(1) }
             )
@@ -125,11 +126,11 @@ fun TelegramBottomNav(
                 icon = {
                     Icon(
                         imageVector = Icons.Default.Settings,
-                        contentDescription = "Settings",
+                        contentDescription = strings.navSettings,
                         modifier = Modifier.size(24.dp)
                     )
                 },
-                label = "Settings",
+                label = strings.navSettings,
                 isSelected = selectedIndex == 2,
                 onClick = { onSelect(2) }
             )
@@ -143,7 +144,7 @@ fun TelegramBottomNav(
                         size = 26.dp
                     )
                 },
-                label = "Profile",
+                label = strings.navProfile,
                 isSelected = selectedIndex == 3,
                 onClick = { onSelect(3) }
             )
