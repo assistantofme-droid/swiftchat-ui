@@ -28,7 +28,7 @@ import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Group
-import androidx.compose.material.icons.filled.Loudspeaker
+import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
@@ -193,7 +193,7 @@ fun ContactsScreen(
                     )
                     ActionChip(
                         modifier = Modifier.weight(1f),
-                        icon = Icons.Default.Loudspeaker,
+                        icon = Icons.Default.Campaign,
                         label = "New Channel",
                         onClick = onNewChannel
                     )

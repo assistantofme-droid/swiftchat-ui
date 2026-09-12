@@ -70,6 +70,7 @@ import com.example.ui.theme.LightGlassHeader
 import com.example.ui.theme.LightPinIcon
 import com.example.ui.theme.LightPrimary
 import com.example.ui.theme.LightSurface
+import com.example.ui.theme.LightAccent
 import com.example.ui.theme.LightTextMuted
 import com.example.ui.theme.LightTextPrimary
 import com.example.ui.theme.LightTextSecondary

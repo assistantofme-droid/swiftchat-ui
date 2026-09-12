@@ -24,23 +24,16 @@ private val TelegramDarkColorScheme = darkColorScheme(
 )
 
 // ============================================================
-// Light palette
+// Light palette — uses the public Light* colors defined in Color.kt
+// (no private re-declaration, which caused overload-resolution ambiguity)
 // ============================================================
-private val LightBackground = Color(0xFFF0F2F5)
-private val LightSurface = Color(0xFFFFFFFF)
-private val LightSurfaceVariant = Color(0xFFE9EBEE)
-private val LightTextPrimary = Color(0xFF1B1D22)
-private val LightTextSecondary = Color(0xFF65758A)
-private val LightPrimary = Color(0xFF2A9CE0)
-private val LightAccent = Color(0xFF36A8F2)
-
 private val TelegramLightColorScheme = lightColorScheme(
     primary = LightPrimary,
     onPrimary = Color.White,
     secondary = LightAccent,
     onSecondary = Color.White,
     tertiary = Color(0xFF4FA6DB),
-    background = LightBackground,
+    background = LightChatListBg,
     onBackground = LightTextPrimary,
     surface = LightSurface,
     onSurface = LightTextPrimary,
