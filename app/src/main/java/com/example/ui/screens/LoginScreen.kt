@@ -85,12 +85,11 @@ fun LoginScreen(
     errorMessage: String?,
     onSendOtp: (String) -> Unit,
     onVerifyOtp: (String, String) -> Unit,
-    onSkipLogin: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var step by remember { mutableStateOf(AuthStep.PHONE_INPUT) }
     var countryCode by remember { mutableStateOf("+98") }
-    var phoneNumber by remember { mutableStateOf("9121234567") }
+    var phoneNumber by remember { mutableStateOf("") }
     var otpCode by remember { mutableStateOf("") }
     var timerSeconds by remember { mutableIntStateOf(60) }
     val focusManager = LocalFocusManager.current
@@ -146,14 +145,6 @@ fun LoginScreen(
                     }
                 }
                 Spacer(modifier = Modifier.weight(1f))
-                TextButton(onClick = onSkipLogin) {
-                    Text(
-                        text = "Skip / Guest",
-                        color = TelegramPrimary,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -333,44 +324,6 @@ fun LoginScreen(
                             }
 
                             Spacer(modifier = Modifier.height(16.dp))
-
-                            // Demo / Quick Test info box
-                            Surface(
-                                color = Color(0x332AABEE),
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        phoneNumber = "9121234567"
-                                    }
-                                    .padding(vertical = 4.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Phone,
-                                        contentDescription = null,
-                                        tint = TelegramPrimary,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Column {
-                                        Text(
-                                            text = "Default Test Phone: 989121234567",
-                                            color = Color.White,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                        Text(
-                                            text = "Tap here to auto-fill sample phone",
-                                            color = TelegramTextSecondary,
-                                            fontSize = 11.sp
-                                        )
-                                    }
-                                }
-                            }
                         }
 
                         AuthStep.OTP_VERIFY -> {
@@ -421,7 +374,7 @@ fun LoginScreen(
                                     }
                                 },
                                 label = { Text("Confirmation Code (کد تأیید)", color = TelegramTextMuted) },
-                                placeholder = { Text("1234", color = TelegramTextMuted) },
+                                placeholder = { Text("Code", color = TelegramTextMuted) },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(
                                     keyboardType = KeyboardType.NumberPassword,
@@ -523,18 +476,6 @@ fun LoginScreen(
                             }
 
                             Spacer(modifier = Modifier.height(8.dp))
-
-                            // Fast test auto-fill button
-                            TextButton(onClick = {
-                                otpCode = "1234"
-                                onVerifyOtp(fullPhone, "1234")
-                            }) {
-                                Text(
-                                    text = "⚡ Test Code: 1234",
-                                    color = Color(0xFF64B5F6),
-                                    fontSize = 13.sp
-                                )
-                            }
                         }
                     }
                 }

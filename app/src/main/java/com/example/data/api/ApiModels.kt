@@ -34,6 +34,15 @@ data class VerifyOtpResponse(
 )
 
 @JsonClass(generateAdapter = true)
+data class ApiProfileSong(
+    @Json(name = "title") val title: String? = null,
+    @Json(name = "url") val url: String? = null,
+    @Json(name = "senderName") val senderName: String? = null,
+    @Json(name = "duration") val duration: Int? = null,
+    @Json(name = "coverUrl") val coverUrl: String? = null
+)
+
+@JsonClass(generateAdapter = true)
 data class ApiUser(
     @Json(name = "_id") val _id: String? = null,
     @Json(name = "phone") val phone: String? = null,
@@ -48,7 +57,9 @@ data class ApiUser(
     @Json(name = "isPhoneHidden") val isPhoneHidden: Boolean? = false,
     @Json(name = "isNewUser") val isNewUser: Boolean? = false,
     @Json(name = "profileColor") val profileColor: String? = null,
-    @Json(name = "birthday") val birthday: String? = null
+    @Json(name = "birthday") val birthday: String? = null,
+    @Json(name = "profileActiveSong") val profileActiveSong: ApiProfileSong? = null,
+    @Json(name = "profileSongs") val profileSongs: List<ApiProfileSong>? = null
 )
 
 @JsonClass(generateAdapter = true)

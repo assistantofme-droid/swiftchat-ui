@@ -29,7 +29,10 @@ import com.example.ui.media.AudioPlayerManager
 import com.example.ui.media.MediaNotificationHelper
 import com.example.ui.screens.ChatDetailScreen
 import com.example.ui.screens.ChatListScreen
+import com.example.ui.screens.ContactsScreen
 import com.example.ui.screens.LoginScreen
+import com.example.ui.screens.ProfileScreen
+import com.example.ui.screens.SettingsScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.theme.TelegramDarkBg
 import com.example.viewmodel.ChatViewModel
@@ -106,8 +109,7 @@ fun TelegramApp(
                     isLoading = uiState.isAuthLoading,
                     errorMessage = uiState.authErrorMessage,
                     onSendOtp = { phone -> viewModel.sendOtp(phone) },
-                    onVerifyOtp = { phone, code -> viewModel.verifyOtp(phone, code) },
-                    onSkipLogin = { viewModel.skipLogin() }
+                    onVerifyOtp = { phone, code -> viewModel.verifyOtp(phone, code) }
                 )
             } else {
                 AnimatedContent(
@@ -117,33 +119,8 @@ fun TelegramApp(
                     },
                     label = "ChatNavigation"
                 ) { selectedChatId ->
-                    if (selectedChatId == null) {
-                        ChatListScreen(
-                            chats = uiState.chats,
-                            selectedCategoryTab = uiState.selectedCategoryTab,
-                            selectedBottomNavIndex = uiState.selectedBottomNavIndex,
-                            isSearching = uiState.isSearching,
-                            searchQuery = uiState.searchQuery,
-                            isRefreshing = uiState.isRefreshing,
-                            currentUserName = uiState.currentUserName,
-                            currentUserPhone = uiState.currentUserPhone,
-                            currentUserAvatar = uiState.currentUserAvatar,
-                            onRefresh = { viewModel.refreshConversations() },
-                            onLogout = { viewModel.logout() },
-                            onSearchToggle = { viewModel.setSearching(it) },
-                            onSearchQueryChange = { viewModel.updateSearchQuery(it) },
-                            onCategoryTabSelect = { viewModel.selectCategoryTab(it) },
-                            onBottomNavSelect = { viewModel.selectBottomNavIndex(it) },
-                            onChatClick = { chat ->
-                                viewModel.selectChat(chat.id)
-                            },
-                            onNewChatClick = {
-                                if (uiState.chats.isNotEmpty()) {
-                                    viewModel.selectChat(uiState.chats.first().id)
-                                }
-                            }
-                        )
-                    } else {
+                    if (selectedChatId != null) {
+                        // Chat detail always takes priority when a chat is open
                         val selectedChat = uiState.chats.find { it.id == selectedChatId }
                             ?: uiState.chats.firstOrNull()
                         if (selectedChat != null) {
@@ -210,20 +187,77 @@ fun TelegramApp(
                                 }
                             )
                         }
-                    }
-                }
-
-                // Global Profile Modal if opened from main list
-                if (uiState.selectedChatId == null) {
-                    com.example.ui.components.UserProfileModal(
-                        visible = uiState.isProfileModalOpen,
-                        user = uiState.profileUser,
-                        isUpdating = uiState.isProfileUpdating,
-                        onDismiss = { viewModel.closeUserProfile() },
-                        onUpdateProfile = { name, username, bio ->
-                            viewModel.updateProfile(name, username, bio)
+                    } else {
+                        // Bottom-nav tab routing: 0=Chats, 1=Contacts, 2=Settings, 3=Profile
+                        when (uiState.selectedBottomNavIndex) {
+                            1 -> ContactsScreen(
+                                contacts = uiState.contacts,
+                                isLoading = uiState.isContactsLoading,
+                                errorMessage = uiState.contactsError,
+                                addContactStatus = uiState.addContactStatus,
+                                currentUserAvatarUrl = uiState.currentUserAvatar,
+                                onLaunchLoad = { viewModel.loadContacts() },
+                                onAddContact = { viewModel.addContact(it) },
+                                onClearAddStatus = { viewModel.clearAddContactStatus() },
+                                onSelectBottomNav = { viewModel.selectBottomNavIndex(it) },
+                                selectedBottomNavIndex = 1
+                            )
+                            2 -> SettingsScreen(
+                                meUser = uiState.meUser,
+                                currentUserAvatarUrl = uiState.currentUserAvatar,
+                                selectedBottomNavIndex = 2,
+                                onSelectBottomNav = { viewModel.selectBottomNavIndex(it) },
+                                onLogout = { viewModel.logout() }
+                            )
+                            3 -> ProfileScreen(
+                                meUser = uiState.meUser,
+                                myChannel = uiState.myChannel,
+                                isMeLoading = uiState.isMeLoading,
+                                isProfileUpdating = uiState.isProfileUpdating,
+                                selectedBottomNavIndex = 3,
+                                onSelectBottomNav = { viewModel.selectBottomNavIndex(it) },
+                                onRefreshMe = { viewModel.refreshMe() },
+                                onUploadAvatar = { uri -> viewModel.uploadAvatar(uri.toString()) },
+                                onEditInfo = { viewModel.openCurrentUserProfile() }
+                            )
+                            else -> ChatListScreen(
+                                chats = uiState.chats,
+                                selectedCategoryTab = uiState.selectedCategoryTab,
+                                selectedBottomNavIndex = uiState.selectedBottomNavIndex,
+                                isSearching = uiState.isSearching,
+                                searchQuery = uiState.searchQuery,
+                                isRefreshing = uiState.isRefreshing,
+                                currentUserName = uiState.currentUserName,
+                                currentUserPhone = uiState.currentUserPhone,
+                                currentUserAvatar = uiState.currentUserAvatar,
+                                onRefresh = { viewModel.refreshConversations() },
+                                onLogout = { viewModel.logout() },
+                                onSearchToggle = { viewModel.setSearching(it) },
+                                onSearchQueryChange = { viewModel.updateSearchQuery(it) },
+                                onCategoryTabSelect = { viewModel.selectCategoryTab(it) },
+                                onBottomNavSelect = { viewModel.selectBottomNavIndex(it) },
+                                onChatClick = { chat ->
+                                    viewModel.selectChat(chat.id)
+                                },
+                                onNewChatClick = {
+                                    if (uiState.chats.isNotEmpty()) {
+                                        viewModel.selectChat(uiState.chats.first().id)
+                                    }
+                                }
+                            )
                         }
-                    )
+
+                        // Global Profile Modal — available from list screens too
+                        com.example.ui.components.UserProfileModal(
+                            visible = uiState.isProfileModalOpen,
+                            user = uiState.profileUser,
+                            isUpdating = uiState.isProfileUpdating,
+                            onDismiss = { viewModel.closeUserProfile() },
+                            onUpdateProfile = { name, username, bio ->
+                                viewModel.updateProfile(name, username, bio)
+                            }
+                        )
+                    }
                 }
             }
         }

@@ -7,10 +7,14 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.api.ApiClient
 import com.example.data.api.ApiConversation
+import com.example.data.api.ApiContact
 import com.example.data.api.ApiLocation
 import com.example.data.api.ApiMessage
 import com.example.data.api.ApiPoll
 import com.example.data.api.ApiPollOption
+import com.example.data.api.ApiProfileSong
+import com.example.data.api.ApiUser
+import com.example.data.api.AddContactRequest
 import com.example.data.api.EditMessageRequest
 import com.example.data.api.ForwardMessageRequest
 import com.example.data.api.PinMessageRequest
@@ -81,7 +85,20 @@ data class ChatUiState(
     // Profile Modal
     val isProfileModalOpen: Boolean = false,
     val profileUser: UserProfileData? = null,
-    val isProfileUpdating: Boolean = false
+    val isProfileUpdating: Boolean = false,
+
+    // Contacts screen (GET /auth/contacts)
+    val contacts: List<ApiContact> = emptyList(),
+    val isContactsLoading: Boolean = false,
+    val contactsError: String? = null,
+    val addContactStatus: String? = null,
+
+    // Profile screen — full user from /auth/me (incl. profileActiveSong, birthday, etc.)
+    val meUser: ApiUser? = null,
+    val isMeLoading: Boolean = false,
+
+    // Owned channel (for Profile screen channel card) — first channel where user is owner
+    val myChannel: ApiConversation? = null
 )
 
 class ChatViewModel(application: Application) : AndroidViewModel(application) {
@@ -124,6 +141,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     /** Refresh the current user from /auth/me and persist into SessionManager. */
     private fun bootstrapCurrentUser() {
         viewModelScope.launch {
+            _uiState.update { it.copy(isMeLoading = true) }
             try {
                 val resp = ApiClient.service.getMe()
                 if (resp.isSuccessful && resp.body() != null) {
@@ -142,12 +160,186 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                             currentUserName = u.name ?: it.currentUserName,
                             currentUserPhone = u.phone ?: it.currentUserPhone,
                             currentUserAvatar = u.avatar ?: it.currentUserAvatar,
-                            currentUserBio = u.bio ?: it.currentUserBio
+                            currentUserBio = u.bio ?: it.currentUserBio,
+                            meUser = u,
+                            isMeLoading = false
+                        )
+                    }
+                    // After me is loaded, fetch the user's owned channel for the Profile card.
+                    fetchMyChannel(u._id)
+                } else {
+                    _uiState.update { it.copy(isMeLoading = false) }
+                }
+            } catch (e: Exception) {
+                Log.w("ChatViewModel", "bootstrapCurrentUser: ${e.message}")
+                _uiState.update { it.copy(isMeLoading = false) }
+            }
+        }
+    }
+
+    /**
+     * Find the first conversation where type=channel and owner._id == userId.
+     * Used by the Profile screen channel card.
+     */
+    private fun fetchMyChannel(userId: String?) {
+        if (userId == null) return
+        viewModelScope.launch {
+            try {
+                val resp = ApiClient.service.getConversations()
+                if (resp.isSuccessful && !resp.body().isNullOrEmpty()) {
+                    val channel = resp.body()!!.firstOrNull {
+                        (it.isChannel == true || it.type == "channel") &&
+                                (it.owner?._id == userId)
+                    }
+                    _uiState.update { it.copy(myChannel = channel) }
+                }
+            } catch (e: Exception) {
+                Log.w("ChatViewModel", "fetchMyChannel: ${e.message}")
+            }
+        }
+    }
+
+    // =============================================================
+    // Contacts — GET /auth/contacts, POST /auth/contacts
+    // =============================================================
+
+    /** Fetch the authenticated user's contacts list. */
+    fun loadContacts() {
+        _uiState.update {
+            it.copy(isContactsLoading = true, contactsError = null, addContactStatus = null)
+        }
+        viewModelScope.launch {
+            try {
+                val resp = ApiClient.service.getContacts()
+                if (resp.isSuccessful && resp.body() != null) {
+                    _uiState.update {
+                        it.copy(
+                            contacts = resp.body()!!,
+                            isContactsLoading = false,
+                            contactsError = null
+                        )
+                    }
+                } else {
+                    val err = parseErrorBody(resp.errorBody())
+                    _uiState.update {
+                        it.copy(
+                            isContactsLoading = false,
+                            contactsError = err ?: "Failed to load contacts (${resp.code()})"
                         )
                     }
                 }
             } catch (e: Exception) {
-                Log.w("ChatViewModel", "bootstrapCurrentUser: ${e.message}")
+                Log.e("ChatViewModel", "loadContacts error", e)
+                _uiState.update {
+                    it.copy(
+                        isContactsLoading = false,
+                        contactsError = "Network error: ${e.localizedMessage ?: "check connection"}"
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Add a contact by phone or username. Server figures out which.
+     * On success, reloads the contacts list so the new contact appears.
+     */
+    fun addContact(identifier: String) {
+        if (identifier.isBlank()) return
+        _uiState.update { it.copy(addContactStatus = null) }
+        viewModelScope.launch {
+            try {
+                val resp = ApiClient.service.addContact(AddContactRequest(identifier = identifier.trim()))
+                if (resp.isSuccessful) {
+                    _uiState.update {
+                        it.copy(addContactStatus = "Contact added: ${resp.body()?.name ?: identifier}")
+                    }
+                    loadContacts() // refresh list
+                } else {
+                    val err = parseErrorBody(resp.errorBody())
+                    _uiState.update {
+                        it.copy(addContactStatus = "Failed: ${err ?: "code ${resp.code()}"}")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "addContact error", e)
+                _uiState.update {
+                    it.copy(addContactStatus = "Network error: ${e.localizedMessage ?: "check connection"}")
+                }
+            }
+        }
+    }
+
+    fun clearAddContactStatus() {
+        _uiState.update { it.copy(addContactStatus = null) }
+    }
+
+    /**
+     * Public hook for the Profile screen to refresh /auth/me on demand.
+     * Re-uses bootstrapCurrentUser.
+     */
+    fun refreshMe() = bootstrapCurrentUser()
+
+    /**
+     * Upload a new avatar image via PUT /auth/profile (multipart).
+     * The server stores the file under /uploads/avatars/ and returns
+     * the updated User object. We then refresh session + UI state.
+     */
+    fun uploadAvatar(uriString: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isProfileUpdating = true) }
+            try {
+                val file = uriToFile(uriString) ?: run {
+                    _uiState.update {
+                        it.copy(
+                            isProfileUpdating = false,
+                            networkBannerMessage = "Could not read selected image"
+                        )
+                    }
+                    return@launch
+                }
+                val mime = guessMime(uriString)
+                val reqFile = file.asRequestBody(mime.toMediaTypeOrNull())
+                val filePart = MultipartBody.Part.createFormData("file", file.name, reqFile)
+
+                val resp = ApiClient.service.updateProfileAvatar(filePart)
+                if (resp.isSuccessful && resp.body() != null) {
+                    val u = resp.body()!!
+                    sessionManager.saveSession(
+                        token = sessionManager.token ?: return@launch,
+                        id = u._id ?: sessionManager.userId,
+                        phone = u.phone ?: sessionManager.phone,
+                        name = u.name ?: sessionManager.name,
+                        username = u.username ?: sessionManager.username,
+                        avatar = u.avatar ?: sessionManager.avatar,
+                        bio = u.bio ?: sessionManager.bio
+                    )
+                    _uiState.update {
+                        it.copy(
+                            currentUserAvatar = u.avatar ?: it.currentUserAvatar,
+                            currentUserName = u.name ?: it.currentUserName,
+                            currentUserBio = u.bio ?: it.currentUserBio,
+                            meUser = u,
+                            isProfileUpdating = false
+                        )
+                    }
+                } else {
+                    val err = parseErrorBody(resp.errorBody())
+                    _uiState.update {
+                        it.copy(
+                            isProfileUpdating = false,
+                            networkBannerMessage = "Avatar upload failed (${resp.code()}): ${err ?: "error"}"
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "uploadAvatar error", e)
+                _uiState.update {
+                    it.copy(
+                        isProfileUpdating = false,
+                        networkBannerMessage = "Network error uploading avatar: ${e.localizedMessage ?: "check connection"}"
+                    )
+                }
             }
         }
     }
@@ -247,16 +439,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
-    }
-
-    fun skipLogin() {
-        _uiState.update {
-            it.copy(
-                isAuthenticated = true,
-                authErrorMessage = null
-            )
-        }
-        refreshConversations()
     }
 
     fun logout() {
