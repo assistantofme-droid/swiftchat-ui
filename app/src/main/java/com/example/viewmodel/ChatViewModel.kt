@@ -1252,7 +1252,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     _uiState.update {
                         it.copy(
                             profileUser = it.profileUser?.copy(
-                                name = u.name ?: it.profileUser?.name,
+                                name = u.name ?: it.profileUser?.name ?: "User",
                                 username = u.username ?: it.profileUser?.username,
                                 phone = u.phone ?: it.profileUser?.phone,
                                 bio = u.bio ?: it.profileUser?.bio,

@@ -365,6 +365,22 @@ interface ApiService {
     suspend fun getIceServers(): Response<List<IceServer>>
 
     // =============================================================
+    // P2P Calls — legacy REST endpoints kept for CallManager.kt
+    // (The actual signaling happens over Socket.IO per spec §13.1,
+    //  but the client still calls these for call logging / state.)
+    // =============================================================
+
+    @POST("calls/initiate")
+    suspend fun initiateCall(
+        @Body request: InitiateCallRequest
+    ): Response<CallResponse>
+
+    @POST("calls/{callId}/end")
+    suspend fun endCall(
+        @Path("callId") callId: String
+    ): Response<ResponseBody>
+
+    // =============================================================
     // Ads
     // =============================================================
 
