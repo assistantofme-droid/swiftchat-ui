@@ -149,3 +149,16 @@ data class UpdateProfileRequest(
     @Json(name = "bio") val bio: String? = null,
     @Json(name = "avatar") val avatar: String? = null
 )
+
+@JsonClass(generateAdapter = true)
+data class InitiateCallRequest(
+    @Json(name = "recipientId") val recipientId: String,
+    @Json(name = "type") val type: String = "voice"
+)
+
+@JsonClass(generateAdapter = true)
+data class CallResponse(
+    @Json(name = "callId") val callId: String? = null,
+    @Json(name = "status") val status: String? = null,
+    @Json(name = "type") val type: String? = null
+)

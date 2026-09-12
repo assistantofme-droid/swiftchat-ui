@@ -20,7 +20,10 @@ enum class MessageType {
     PHOTO,
     VIDEO,
     AUDIO,
-    GIF
+    GIF,
+    LOCATION,
+    POLL,
+    FILE
 }
 
 data class ReactionItem(
@@ -77,13 +80,19 @@ data class ChatItem(
     val typingUser: String? = null,
     val avatarType: AvatarType = AvatarType.MOTORCYCLE,
     val avatarResId: Int? = null,
-    val avatarUrl: String? = null
-)
+    val avatarUrl: String? = null,
+    val isGroup: Boolean = false,
+    val memberCount: Int = 0,
+    val isOnline: Boolean = false
+) {
+    val name: String get() = title
+}
 
 data class MediaPickerItem(
     val id: String,
     val isCamera: Boolean = false,
     val drawableResId: Int? = null,
+    val uriString: String? = null,
     val isSelected: Boolean = false,
     val selectionIndex: Int = 0
 )
@@ -91,8 +100,8 @@ data class MediaPickerItem(
 enum class AttachmentTab(val label: String) {
     GALLERY("Gallery"),
     FILE("File"),
+    MUSIC("Music"),
     LOCATION("Location"),
-    ARTICLE("Article"),
-    CHECKLIST("Checklist"),
+    POLL("Poll"),
     CONTACT("Contact")
 }

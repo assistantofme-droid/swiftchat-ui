@@ -4,6 +4,10 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
     <application
         android:allowBackup="true"
@@ -18,6 +22,8 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:supportsPictureInPicture="true"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation"
             android:label="@string/app_name"
             android:theme="@style/Theme.MyApplication">
             <intent-filter>
@@ -26,6 +32,19 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <receiver
+            android:name=".ui.media.MediaReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.example.ACTION_PLAY_PAUSE" />
+                <action android:name="com.example.ACTION_NEXT" />
+                <action android:name="com.example.ACTION_PREVIOUS" />
+                <action android:name="com.example.ACTION_STOP" />
+                <action android:name="com.example.ACTION_CALL_MUTE" />
+                <action android:name="com.example.ACTION_CALL_END" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,36 +21,36 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Cake
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.QrCode
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
-import androidx.compose.material3.TabRowDefaults
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -63,12 +64,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
-import com.example.data.api.ApiClient
 import com.example.data.model.AvatarType
 import com.example.ui.theme.TelegramDarkBg
 import com.example.ui.theme.TelegramPrimary
@@ -85,7 +86,8 @@ data class UserProfileData(
     val avatarUrl: String? = null,
     val avatarType: AvatarType = AvatarType.MOTORCYCLE,
     val isOnline: Boolean = true,
-    val isSelf: Boolean = false
+    val isSelf: Boolean = false,
+    val birthday: String? = "Aug 23"
 )
 
 @Composable
@@ -98,6 +100,7 @@ fun UserProfileModal(
 ) {
     if (!visible || user == null) return
 
+    val clipboardManager = LocalClipboardManager.current
     var isEditProfileDialogOpen by remember { mutableStateOf(false) }
     var editName by remember(user.name) { mutableStateOf(user.name) }
     var editUsername by remember(user.username) { mutableStateOf(user.username.orEmpty()) }
@@ -105,42 +108,29 @@ fun UserProfileModal(
 
     var isMuted by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableIntStateOf(0) }
+    val profileTabs = listOf("Gifts 🏆🎂", "Media", "Files", "Links", "Voice")
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(TelegramDarkBg)
+    AnimatedVisibility(
+        visible = visible,
+        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .background(TelegramDarkBg)
+                .statusBarsPadding()
+                .navigationBarsPadding()
         ) {
-            // Hero Top Section with Avatar & Gradient
-            Box(
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(280.dp)
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
             ) {
-                // Background Gradient or Cover
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color(0xFF2B5278),
-                                    Color(0xFF182533)
-                                )
-                            )
-                        )
-                )
-
-                // Top Controls
+                // Top Action Bar
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .statusBarsPadding()
                         .padding(horizontal = 8.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
@@ -149,7 +139,7 @@ fun UserProfileModal(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = Color.White
+                            tint = TelegramTextPrimary
                         )
                     }
 
@@ -159,345 +149,453 @@ fun UserProfileModal(
                                 Icon(
                                     imageVector = Icons.Default.Edit,
                                     contentDescription = "Edit Profile",
-                                    tint = Color.White
+                                    tint = TelegramTextSecondary
                                 )
                             }
                         }
-                        IconButton(onClick = { /* Share */ }) {
+                        IconButton(onClick = {}) {
                             Icon(
                                 imageVector = Icons.Default.Share,
                                 contentDescription = "Share",
-                                tint = Color.White
+                                tint = TelegramTextSecondary
                             )
                         }
-                        IconButton(onClick = { /* More */ }) {
+                        IconButton(onClick = {}) {
                             Icon(
                                 imageVector = Icons.Default.MoreVert,
                                 contentDescription = "More",
-                                tint = Color.White
+                                tint = TelegramTextSecondary
                             )
                         }
                     }
                 }
 
-                // Avatar and Name Container
+                // Centered Avatar + Name + Shield Badge matching Screenshot 5
                 Column(
                     modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(start = 20.dp, bottom = 16.dp)
+                        .fillMaxWidth()
+                        .padding(vertical = 10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    AvatarView(
-                        avatarType = user.avatarType,
-                        avatarUrl = user.avatarUrl,
-                        title = user.name,
-                        size = 80.dp,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(100.dp)
+                            .clip(CircleShape)
+                            .border(
+                                width = 2.dp,
+                                brush = Brush.linearGradient(
+                                    listOf(TelegramPrimary, Color(0xFFAB47BC), Color(0xFF00E5FF))
+                                ),
+                                shape = CircleShape
+                            )
+                    ) {
+                        AvatarView(
+                            avatarType = user.avatarType,
+                            avatarUrl = user.avatarUrl,
+                            title = user.name,
+                            size = 100.dp
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     Text(
                         text = user.name,
                         color = TelegramTextPrimary,
-                        fontSize = 22.sp,
+                        fontSize = 21.sp,
                         fontWeight = FontWeight.Bold
                     )
 
-                    Text(
-                        text = if (user.isOnline) "online" else "last seen recently",
-                        color = if (user.isOnline) TelegramPrimary else TelegramTextSecondary,
-                        fontSize = 13.sp
-                    )
-                }
-            }
+                    Spacer(modifier = Modifier.height(6.dp))
 
-            // Quick Actions Bar (Call, Video, Mute, Search)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFF1E2833))
-                    .padding(vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                QuickActionButton(
-                    icon = Icons.Default.Chat,
-                    label = "Message",
-                    onClick = onDismiss
-                )
-                QuickActionButton(
-                    icon = Icons.Default.Call,
-                    label = "Audio",
-                    onClick = {}
-                )
-                QuickActionButton(
-                    icon = Icons.Default.Videocam,
-                    label = "Video",
-                    onClick = {}
-                )
-                QuickActionButton(
-                    icon = Icons.Default.Notifications,
-                    label = if (isMuted) "Unmute" else "Mute",
-                    onClick = { isMuted = !isMuted }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Info Card (Account Details)
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFF1E2833))
-                    .padding(horizontal = 16.dp, vertical = 14.dp)
-            ) {
-                Text(
-                    text = "Account",
-                    color = TelegramPrimary,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(bottom = 10.dp)
-                )
-
-                // Phone number
-                if (!user.phone.isNullOrBlank()) {
-                    ProfileInfoRow(
-                        title = user.phone,
-                        subtitle = "Mobile"
-                    )
-                    HorizontalDivider(
-                        color = Color.White.copy(alpha = 0.08f),
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    )
+                    // Shield status pill matching Screenshot 5
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0x332E7D32))
+                            .border(0.8.dp, Color(0x664CAF50), RoundedCornerShape(12.dp))
+                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Security,
+                            contentDescription = "Online Status",
+                            tint = Color(0xFF4CAF50),
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (user.isOnline) "1 online" else "last seen recently",
+                            color = Color(0xFF4CAF50),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
 
-                // Username
-                if (!user.username.isNullOrBlank()) {
-                    ProfileInfoRow(
-                        title = "@${user.username}",
-                        subtitle = "Username"
-                    )
-                    HorizontalDivider(
-                        color = Color.White.copy(alpha = 0.08f),
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    )
-                }
-
-                // Bio
-                ProfileInfoRow(
-                    title = user.bio ?: "Hey there! I am using Telegram.",
-                    subtitle = "Bio"
-                )
-
-                HorizontalDivider(
-                    color = Color.White.copy(alpha = 0.08f),
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-
-                // Notifications Toggle
+                // 3 Action Buttons matching Screenshot 5: Message, Mute, Call
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(text = "Notifications", color = TelegramTextPrimary, fontSize = 15.sp)
-                        Text(text = if (isMuted) "Disabled" else "Enabled", color = TelegramTextSecondary, fontSize = 13.sp)
-                    }
-                    Switch(
-                        checked = !isMuted,
-                        onCheckedChange = { isMuted = !it },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = TelegramPrimary,
-                            uncheckedThumbColor = Color.Gray,
-                            uncheckedTrackColor = Color.DarkGray
-                        )
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Shared Media Tabs
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFF1E2833))
-                    .navigationBarsPadding()
-            ) {
-                TabRow(
-                    selectedTabIndex = selectedTab,
-                    containerColor = Color.Transparent,
-                    contentColor = TelegramPrimary,
-                    indicator = { tabPositions ->
-                        TabRowDefaults.SecondaryIndicator(
-                            modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                            color = TelegramPrimary,
-                            height = 2.dp
-                        )
-                    }
-                ) {
-                    Tab(
-                        selected = selectedTab == 0,
-                        onClick = { selectedTab = 0 },
-                        text = { Text("Media", fontSize = 13.sp) },
-                        selectedContentColor = TelegramPrimary,
-                        unselectedContentColor = TelegramTextSecondary
-                    )
-                    Tab(
-                        selected = selectedTab == 1,
-                        onClick = { selectedTab = 1 },
-                        text = { Text("Files", fontSize = 13.sp) },
-                        selectedContentColor = TelegramPrimary,
-                        unselectedContentColor = TelegramTextSecondary
-                    )
-                    Tab(
-                        selected = selectedTab == 2,
-                        onClick = { selectedTab = 2 },
-                        text = { Text("Audio", fontSize = 13.sp) },
-                        selectedContentColor = TelegramPrimary,
-                        unselectedContentColor = TelegramTextSecondary
-                    )
-                    Tab(
-                        selected = selectedTab == 3,
-                        onClick = { selectedTab = 3 },
-                        text = { Text("Links", fontSize = 13.sp) },
-                        selectedContentColor = TelegramPrimary,
-                        unselectedContentColor = TelegramTextSecondary
-                    )
-                }
-
-                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(140.dp),
-                    contentAlignment = Alignment.Center
+                        .padding(horizontal = 24.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    Text(
-                        text = when (selectedTab) {
-                            0 -> "Shared photos and videos appear here"
-                            1 -> "Shared documents and files appear here"
-                            2 -> "Shared audio files and voice notes appear here"
-                            else -> "Shared links and articles appear here"
-                        },
-                        color = TelegramTextMuted,
-                        fontSize = 13.sp
+                    ProfileActionButton(
+                        icon = Icons.Default.Chat,
+                        label = "Message",
+                        modifier = Modifier.weight(1f),
+                        onClick = onDismiss
+                    )
+                    ProfileActionButton(
+                        icon = Icons.Default.Notifications,
+                        label = if (isMuted) "Unmute" else "Mute",
+                        modifier = Modifier.weight(1f),
+                        onClick = { isMuted = !isMuted }
+                    )
+                    ProfileActionButton(
+                        icon = Icons.Default.Call,
+                        label = "Call",
+                        modifier = Modifier.weight(1f),
+                        onClick = {}
                     )
                 }
-            }
-        }
 
-        // Edit Profile Dialog (connected to PUT /auth/profile)
-        if (isEditProfileDialogOpen) {
-            AlertDialog(
-                onDismissRequest = { isEditProfileDialogOpen = false },
-                containerColor = Color(0xFF1E2833),
-                title = {
-                    Text(text = "Edit Profile", color = TelegramTextPrimary, fontWeight = FontWeight.Bold)
-                },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        OutlinedTextField(
-                            value = editName,
-                            onValueChange = { editName = it },
-                            label = { Text("Name", color = TelegramTextSecondary) },
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = TelegramTextPrimary,
-                                unfocusedTextColor = TelegramTextPrimary,
-                                focusedBorderColor = TelegramPrimary,
-                                unfocusedBorderColor = Color.White.copy(alpha = 0.2f)
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                Spacer(modifier = Modifier.height(10.dp))
 
-                        OutlinedTextField(
-                            value = editUsername,
-                            onValueChange = { editUsername = it },
-                            label = { Text("Username", color = TelegramTextSecondary) },
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = TelegramTextPrimary,
-                                unfocusedTextColor = TelegramTextPrimary,
-                                focusedBorderColor = TelegramPrimary,
-                                unfocusedBorderColor = Color.White.copy(alpha = 0.2f)
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                // Info Card: Mobile, Bio, Username, Birthday matching Screenshot 5
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(Color(0x33202E3D))
+                        .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(20.dp))
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                ) {
+                    // Mobile
+                    ProfileInfoRow(
+                        title = user.phone ?: "+98 912 345 6789",
+                        subtitle = "Mobile",
+                        trailingAction = {
+                            IconButton(
+                                onClick = {
+                                    clipboardManager.setText(AnnotatedString(user.phone ?: "+98 912 345 6789"))
+                                },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = "Copy phone",
+                                    tint = TelegramTextSecondary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    )
 
-                        OutlinedTextField(
-                            value = editBio,
-                            onValueChange = { editBio = it },
-                            label = { Text("Bio", color = TelegramTextSecondary) },
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = TelegramTextPrimary,
-                                unfocusedTextColor = TelegramTextPrimary,
-                                focusedBorderColor = TelegramPrimary,
-                                unfocusedBorderColor = Color.White.copy(alpha = 0.2f)
-                            ),
-                            modifier = Modifier.fillMaxWidth(),
-                            maxLines = 3
-                        )
-                    }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            onUpdateProfile?.invoke(editName, editUsername, editBio)
-                            isEditProfileDialogOpen = false
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = TelegramPrimary)
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.08f), modifier = Modifier.padding(vertical = 4.dp))
+
+                    // Bio
+                    ProfileInfoRow(
+                        title = user.bio ?: "Hey there! I am using Telegram.",
+                        subtitle = "Bio"
+                    )
+
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.08f), modifier = Modifier.padding(vertical = 4.dp))
+
+                    // Username with QR icon
+                    ProfileInfoRow(
+                        title = if (!user.username.isNullOrBlank()) "@${user.username}" else "@username",
+                        subtitle = "Username",
+                        trailingAction = {
+                            IconButton(onClick = {}, modifier = Modifier.size(28.dp)) {
+                                Icon(
+                                    imageVector = Icons.Default.QrCode,
+                                    contentDescription = "QR Code",
+                                    tint = TelegramPrimary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    )
+
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.08f), modifier = Modifier.padding(vertical = 4.dp))
+
+                    // Birthday
+                    ProfileInfoRow(
+                        title = user.birthday ?: "Aug 23",
+                        subtitle = "Birthday",
+                        trailingAction = {
+                            Icon(
+                                imageVector = Icons.Default.Cake,
+                                contentDescription = "Birthday",
+                                tint = Color(0xFFFFB300),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Shared Media & Gifts Tabs matching Screenshot 5
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                ) {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        if (isUpdating) {
-                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp))
-                        } else {
-                            Text("Save", color = Color.White)
+                        items(profileTabs.indices.toList()) { idx ->
+                            val isSel = selectedTab == idx
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(if (isSel) TelegramPrimary else Color(0x33202E3D))
+                                    .clickable { selectedTab = idx }
+                                    .padding(horizontal = 14.dp, vertical = 8.dp)
+                            ) {
+                                Text(
+                                    text = profileTabs[idx],
+                                    color = if (isSel) Color.White else TelegramTextSecondary,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium
+                                )
+                            }
                         }
                     }
-                },
-                dismissButton = {
-                    TextButton(onClick = { isEditProfileDialogOpen = false }) {
-                        Text("Cancel", color = TelegramTextSecondary)
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    if (selectedTab == 0) {
+                        // Gifts Grid matching Screenshot 5
+                        val gifts = listOf(
+                            Triple("🏆", "Golden Cup", "Rare"),
+                            Triple("🎂", "Sweet Cake", "Celebration"),
+                            Triple("💖", "Heart Glow", "Special"),
+                            Triple("🍾", "Champagne", "Party"),
+                            Triple("💎", "Diamond Star", "Ultra"),
+                            Triple("🚀", "Rocket Blast", "Epic")
+                        )
+
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(3),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(210.dp)
+                        ) {
+                            items(gifts) { gift ->
+                                Column(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(Color(0x33202E3D))
+                                        .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(16.dp))
+                                    .padding(vertical = 12.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(text = gift.first, fontSize = 30.sp)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = gift.second,
+                                        color = TelegramTextPrimary,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        text = gift.third,
+                                        color = TelegramPrimary,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Floating Send Gift Button matching Screenshot 5
+                        Button(
+                            onClick = {},
+                            shape = RoundedCornerShape(20.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = TelegramPrimary),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                        ) {
+                            Text(
+                                text = "🎁  Send a Gift to ${user.name}",
+                                color = Color.White,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(100.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "No ${profileTabs[selectedTab]} shared yet",
+                                color = TelegramTextMuted,
+                                fontSize = 13.sp
+                            )
+                        }
                     }
                 }
-            )
+
+                Spacer(modifier = Modifier.height(30.dp))
+            }
         }
+    }
+
+    // Edit Profile Dialog for Self
+    if (isEditProfileDialogOpen) {
+        AlertDialog(
+            onDismissRequest = { isEditProfileDialogOpen = false },
+            title = {
+                Text(
+                    text = "Edit Profile",
+                    color = TelegramTextPrimary,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = editName,
+                        onValueChange = { editName = it },
+                        label = { Text("Display Name") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = TelegramPrimary,
+                            focusedTextColor = TelegramTextPrimary,
+                            unfocusedTextColor = TelegramTextPrimary
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = editUsername,
+                        onValueChange = { editUsername = it },
+                        label = { Text("Username") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = TelegramPrimary,
+                            focusedTextColor = TelegramTextPrimary,
+                            unfocusedTextColor = TelegramTextPrimary
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = editBio,
+                        onValueChange = { editBio = it },
+                        label = { Text("Bio") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = TelegramPrimary,
+                            focusedTextColor = TelegramTextPrimary,
+                            unfocusedTextColor = TelegramTextPrimary
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onUpdateProfile?.invoke(editName, editUsername, editBio)
+                        isEditProfileDialogOpen = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = TelegramPrimary)
+                ) {
+                    if (isUpdating) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White)
+                    } else {
+                        Text("Save")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { isEditProfileDialogOpen = false }) {
+                    Text("Cancel", color = TelegramTextSecondary)
+                }
+            },
+            containerColor = Color(0xFF1E2833),
+            shape = RoundedCornerShape(20.dp)
+        )
     }
 }
 
 @Composable
-private fun QuickActionButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+private fun ProfileActionButton(
+    icon: ImageVector,
     label: String,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color(0x33202E3D))
+            .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(16.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .padding(vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = label,
-            tint = TelegramPrimary,
-            modifier = Modifier.size(24.dp)
-        )
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(TelegramPrimary.copy(alpha = 0.2f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = TelegramPrimary,
+                modifier = Modifier.size(20.dp)
+            )
+        }
         Spacer(modifier = Modifier.height(4.dp))
-        Text(text = label, color = TelegramTextSecondary, fontSize = 12.sp)
+        Text(
+            text = label,
+            color = TelegramTextPrimary,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
 
 @Composable
-private fun ProfileInfoRow(title: String, subtitle: String) {
-    Column {
-        Text(
-            text = title,
-            color = TelegramTextPrimary,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Medium
-        )
-        Text(
-            text = subtitle,
-            color = TelegramTextSecondary,
-            fontSize = 12.sp
-        )
+private fun ProfileInfoRow(
+    title: String,
+    subtitle: String,
+    trailingAction: (@Composable () -> Unit)? = null
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                color = TelegramTextPrimary,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = subtitle,
+                color = TelegramTextSecondary,
+                fontSize = 12.sp
+            )
+        }
+        trailingAction?.invoke()
     }
 }

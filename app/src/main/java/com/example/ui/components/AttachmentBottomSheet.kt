@@ -1,5 +1,9 @@
 package com.example.ui.components
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -36,22 +40,23 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Poll
 import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -62,17 +67,18 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.R
 import com.example.data.model.AttachmentTab
 import com.example.data.model.MediaPickerItem
 import com.example.ui.theme.TelegramAccent
 import com.example.ui.theme.TelegramPrimary
 import com.example.ui.theme.TelegramSheetBg
-import com.example.ui.theme.TelegramSheetBorder
 import com.example.ui.theme.TelegramTextPrimary
 import com.example.ui.theme.TelegramTextSecondary
 
@@ -81,9 +87,55 @@ fun AttachmentBottomSheet(
     visible: Boolean,
     onDismiss: () -> Unit,
     onSendMedia: (List<MediaPickerItem>) -> Unit,
+    onSendLocation: ((latitude: Double, longitude: Double, title: String) -> Unit)? = null,
+    onSendPoll: ((question: String, options: List<String>, isAnonymous: Boolean) -> Unit)? = null,
+    onSendFile: ((fileName: String, fileUri: String) -> Unit)? = null,
+    onSendMusic: ((title: String, audioUri: String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    // Initial mock media items matching the screenshot
+    var isLocationDialogOpen by remember { mutableStateOf(false) }
+    var isPollDialogOpen by remember { mutableStateOf(false) }
+
+    // Pick Multiple Photos / Videos from device gallery
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickMultipleVisualMedia(10)
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) {
+            val items = uris.mapIndexed { index, uri ->
+                MediaPickerItem(
+                    id = "device_photo_$index",
+                    uriString = uri.toString(),
+                    isSelected = true
+                )
+            }
+            onSendMedia(items)
+            onDismiss()
+        }
+    }
+
+    // Pick Audio/Music from device
+    val audioPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val name = uri.lastPathSegment?.substringAfterLast("/") ?: "Music Track.mp3"
+            onSendMusic?.invoke(name, uri.toString())
+            onDismiss()
+        }
+    }
+
+    // Pick File/Document from device
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val name = uri.lastPathSegment?.substringAfterLast("/") ?: "Document.pdf"
+            onSendFile?.invoke(name, uri.toString())
+            onDismiss()
+        }
+    }
+
+    // Local media items
     var mediaItems by remember {
         mutableStateOf(
             listOf(
@@ -102,6 +154,29 @@ fun AttachmentBottomSheet(
 
     var activeTab by remember { mutableStateOf(AttachmentTab.GALLERY) }
     val selectedCount = mediaItems.count { it.isSelected }
+
+    // Dialogs
+    if (isLocationDialogOpen) {
+        SendLocationDialog(
+            visible = isLocationDialogOpen,
+            onDismiss = { isLocationDialogOpen = false },
+            onSendLocation = { lat, lng, title ->
+                onSendLocation?.invoke(lat, lng, title)
+                onDismiss()
+            }
+        )
+    }
+
+    if (isPollDialogOpen) {
+        CreatePollDialog(
+            visible = isPollDialogOpen,
+            onDismiss = { isPollDialogOpen = false },
+            onCreatePoll = { question, options, isAnon ->
+                onSendPoll?.invoke(question, options, isAnon)
+                onDismiss()
+            }
+        )
+    }
 
     AnimatedVisibility(
         visible = visible,
@@ -125,7 +200,7 @@ fun AttachmentBottomSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.BottomCenter)
-                    .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                    .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
                     .background(TelegramSheetBg)
                     .clickable(enabled = false) {}
                     .draggable(
@@ -152,11 +227,53 @@ fun AttachmentBottomSheet(
                     )
                 }
 
+                // Device Photo Picker shortcut bar
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Recent Photos",
+                        color = TelegramTextPrimary,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(TelegramPrimary.copy(alpha = 0.2f))
+                            .clickable {
+                                photoPickerLauncher.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
+                                )
+                            }
+                            .padding(horizontal = 10.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AddPhotoAlternate,
+                            contentDescription = "Open Gallery",
+                            tint = TelegramPrimary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Device Gallery",
+                            color = TelegramPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
                 // Main Media Grid (3 Columns)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(300.dp)
+                        .height(280.dp)
                 ) {
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(3),
@@ -174,16 +291,26 @@ fun AttachmentBottomSheet(
                                         .aspectRatio(1f)
                                         .background(Color(0xFF131D27))
                                         .clickable {
-                                            // Handle camera click
+                                            photoPickerLauncher.launch(
+                                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
+                                            )
                                         },
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.PhotoCamera,
-                                        contentDescription = "Camera",
-                                        tint = Color.White.copy(alpha = 0.85f),
-                                        modifier = Modifier.size(36.dp)
-                                    )
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Icon(
+                                            imageVector = Icons.Default.PhotoCamera,
+                                            contentDescription = "Camera",
+                                            tint = Color.White.copy(alpha = 0.85f),
+                                            modifier = Modifier.size(32.dp)
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "Camera",
+                                            color = Color.White.copy(alpha = 0.7f),
+                                            fontSize = 11.sp
+                                        )
+                                    }
                                 }
                             } else {
                                 // Media thumbnail tile
@@ -206,15 +333,18 @@ fun AttachmentBottomSheet(
                                             modifier = Modifier.fillMaxSize(),
                                             contentScale = ContentScale.Crop
                                         )
+                                    } else if (item.uriString != null) {
+                                        AsyncImage(
+                                            model = item.uriString,
+                                            contentDescription = null,
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentScale = ContentScale.Crop
+                                        )
                                     } else {
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxSize()
-                                                .background(
-                                                    Brush.linearGradient(
-                                                        listOf(Color(0xFF2C3E50), Color(0xFF1A252F))
-                                                    )
-                                                )
+                                                .background(Color(0xFF2C3E50))
                                         )
                                     }
 
@@ -274,7 +404,7 @@ fun AttachmentBottomSheet(
                     }
                 }
 
-                // Bottom Tab Bar inside Sheet
+                // Bottom Tab Bar inside Sheet: Gallery, File, Music, Location, Poll, Contact
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -288,39 +418,57 @@ fun AttachmentBottomSheet(
                         label = "Gallery",
                         icon = Icons.Default.PhotoLibrary,
                         isSelected = activeTab == AttachmentTab.GALLERY,
-                        onClick = { activeTab = AttachmentTab.GALLERY }
+                        onClick = {
+                            activeTab = AttachmentTab.GALLERY
+                            photoPickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
+                            )
+                        }
                     )
                     AttachmentTabItem(
                         label = "File",
                         icon = Icons.Default.Folder,
                         isSelected = activeTab == AttachmentTab.FILE,
-                        onClick = { activeTab = AttachmentTab.FILE }
+                        onClick = {
+                            activeTab = AttachmentTab.FILE
+                            filePickerLauncher.launch("*/*")
+                        }
+                    )
+                    AttachmentTabItem(
+                        label = "Music",
+                        icon = Icons.Default.Audiotrack,
+                        isSelected = activeTab == AttachmentTab.MUSIC,
+                        onClick = {
+                            activeTab = AttachmentTab.MUSIC
+                            audioPickerLauncher.launch("audio/*")
+                        }
                     )
                     AttachmentTabItem(
                         label = "Location",
                         icon = Icons.Default.LocationOn,
                         isSelected = activeTab == AttachmentTab.LOCATION,
-                        onClick = { activeTab = AttachmentTab.LOCATION }
+                        onClick = {
+                            activeTab = AttachmentTab.LOCATION
+                            isLocationDialogOpen = true
+                        }
                     )
                     AttachmentTabItem(
-                        label = "Article",
-                        icon = Icons.Default.Description,
-                        hasStar = true,
-                        isSelected = activeTab == AttachmentTab.ARTICLE,
-                        onClick = { activeTab = AttachmentTab.ARTICLE }
-                    )
-                    AttachmentTabItem(
-                        label = "Checklist",
-                        icon = Icons.Default.CheckCircle,
-                        hasStar = true,
-                        isSelected = activeTab == AttachmentTab.CHECKLIST,
-                        onClick = { activeTab = AttachmentTab.CHECKLIST }
+                        label = "Poll",
+                        icon = Icons.Default.Poll,
+                        isSelected = activeTab == AttachmentTab.POLL,
+                        onClick = {
+                            activeTab = AttachmentTab.POLL
+                            isPollDialogOpen = true
+                        }
                     )
                     AttachmentTabItem(
                         label = "Contact",
                         icon = Icons.Default.Person,
                         isSelected = activeTab == AttachmentTab.CONTACT,
-                        onClick = { activeTab = AttachmentTab.CONTACT }
+                        onClick = {
+                            activeTab = AttachmentTab.CONTACT
+                            onDismiss()
+                        }
                     )
                 }
             }
@@ -333,7 +481,6 @@ private fun AttachmentTabItem(
     label: String,
     icon: ImageVector,
     isSelected: Boolean,
-    hasStar: Boolean = false,
     onClick: () -> Unit
 ) {
     val bg = if (isSelected) Color(0xFF243B55) else Color.Transparent
@@ -347,31 +494,12 @@ private fun AttachmentTabItem(
             .padding(horizontal = 14.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = tint,
-                modifier = Modifier.size(24.dp)
-            )
-            if (hasStar) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .size(10.dp)
-                        .clip(CircleShape)
-                        .background(TelegramAccent),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Star,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(8.dp)
-                    )
-                }
-            }
-        }
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = tint,
+            modifier = Modifier.size(24.dp)
+        )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = label,

@@ -1,6 +1,6 @@
 {
-  "name": "Telegram",
-  "description": "High-performance, 60 FPS messaging app replicating the main chat list, starry night chat screen, and attachment panel.",
+  "name": "7eve9Chat",
+  "description": "High-performance messaging app with bubbly glassmorphism, voice & video calls, floating PiP controls, and media player.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

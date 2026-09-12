@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Telegram"
+rootProject.name = "7eve9Chat"
 
 include(":app")

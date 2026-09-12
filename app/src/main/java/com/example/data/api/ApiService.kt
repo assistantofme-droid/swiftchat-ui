@@ -65,4 +65,25 @@ interface ApiService {
     suspend fun updateProfile(
         @Body request: UpdateProfileRequest
     ): Response<ApiUser>
+
+    @retrofit2.http.DELETE("messages/{messageId}")
+    suspend fun deleteMessage(
+        @Path("messageId") messageId: String
+    ): Response<ResponseBody>
+
+    @retrofit2.http.PUT("messages/{messageId}")
+    suspend fun editMessage(
+        @Path("messageId") messageId: String,
+        @Body request: SendMessageRequest
+    ): Response<ApiMessage>
+
+    @POST("calls/initiate")
+    suspend fun initiateCall(
+        @Body request: InitiateCallRequest
+    ): Response<CallResponse>
+
+    @POST("calls/{callId}/end")
+    suspend fun endCall(
+        @Path("callId") callId: String
+    ): Response<ResponseBody>
 }

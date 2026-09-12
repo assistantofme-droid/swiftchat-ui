@@ -928,6 +928,164 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun deleteMessage(messageId: String) {
+        _uiState.update { state ->
+            state.copy(currentMessages = state.currentMessages.filter { it.id != messageId })
+        }
+        viewModelScope.launch {
+            try {
+                ApiClient.service.deleteMessage(messageId)
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "deleteMessage error", e)
+            }
+        }
+    }
+
+    fun editMessage(messageId: String, newText: String) {
+        _uiState.update { state ->
+            val updated = state.currentMessages.map { msg ->
+                if (msg.id == messageId) msg.copy(text = newText) else msg
+            }
+            state.copy(currentMessages = updated)
+        }
+        val currentChatId = _uiState.value.selectedChatId ?: return
+        viewModelScope.launch {
+            try {
+                ApiClient.service.editMessage(
+                    messageId,
+                    SendMessageRequest(
+                        conversationId = currentChatId,
+                        text = newText,
+                        type = "text"
+                    )
+                )
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "editMessage error", e)
+            }
+        }
+    }
+
+    fun pinMessage(messageId: String) {
+        _uiState.update { state ->
+            val msg = state.currentMessages.find { it.id == messageId }
+            state
+        }
+    }
+
+    fun sendLocation(latitude: Double, longitude: Double, title: String) {
+        val currentChatId = _uiState.value.selectedChatId ?: return
+        val currentTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+        val localMessage = MessageItem(
+            id = UUID.randomUUID().toString(),
+            text = "$title ($latitude, $longitude)",
+            time = currentTime,
+            isOutgoing = true,
+            type = MessageType.LOCATION,
+            isRead = false
+        )
+
+        _uiState.update { state ->
+            state.copy(
+                currentMessages = state.currentMessages + localMessage,
+                isAttachmentSheetOpen = false
+            )
+        }
+
+        viewModelScope.launch {
+            try {
+                ApiClient.service.sendMessage(
+                    SendMessageRequest(
+                        conversationId = currentChatId,
+                        text = "$title ($latitude, $longitude)",
+                        type = "location"
+                    )
+                )
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "Failed to send location", e)
+            }
+        }
+    }
+
+    fun sendPoll(question: String, options: List<String>, isAnonymous: Boolean) {
+        val currentChatId = _uiState.value.selectedChatId ?: return
+        val currentTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+        val localMessage = MessageItem(
+            id = UUID.randomUUID().toString(),
+            text = question,
+            time = currentTime,
+            isOutgoing = true,
+            type = MessageType.POLL,
+            isRead = false
+        )
+
+        _uiState.update { state ->
+            state.copy(
+                currentMessages = state.currentMessages + localMessage,
+                isAttachmentSheetOpen = false
+            )
+        }
+
+        viewModelScope.launch {
+            try {
+                ApiClient.service.sendMessage(
+                    SendMessageRequest(
+                        conversationId = currentChatId,
+                        text = question,
+                        type = "poll"
+                    )
+                )
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "Failed to send poll", e)
+            }
+        }
+    }
+
+    fun sendFile(fileName: String, fileUri: String) {
+        val currentChatId = _uiState.value.selectedChatId ?: return
+        val currentTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+        val localMessage = MessageItem(
+            id = UUID.randomUUID().toString(),
+            text = fileName,
+            fileName = fileName,
+            mediaUrl = fileUri,
+            time = currentTime,
+            isOutgoing = true,
+            type = MessageType.FILE,
+            isRead = false
+        )
+
+        _uiState.update { state ->
+            state.copy(
+                currentMessages = state.currentMessages + localMessage,
+                isAttachmentSheetOpen = false
+            )
+        }
+
+        viewModelScope.launch {
+            try {
+                ApiClient.service.sendMessage(
+                    SendMessageRequest(
+                        conversationId = currentChatId,
+                        text = fileName,
+                        type = "file",
+                        fileName = fileName,
+                        fileUrl = fileUri
+                    )
+                )
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "Failed to send file", e)
+            }
+        }
+    }
+
+    fun sendMusic(title: String, audioUri: String) {
+        sendAudioMessage(
+            audioUrl = audioUri,
+            duration = 180,
+            fileName = title
+        )
+    }
+
     fun selectCategoryTab(tab: String) {
         _uiState.update { it.copy(selectedCategoryTab = tab) }
     }

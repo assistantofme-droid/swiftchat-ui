@@ -9,6 +9,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -71,6 +72,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -232,7 +234,8 @@ fun ChatListScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(TelegramDarkBg)
+                    .background(com.example.ui.theme.TelegramGlassHeader)
+                    .border(0.8.dp, com.example.ui.theme.TelegramGlassBorder)
                     .statusBarsPadding()
                     .padding(horizontal = 14.dp, vertical = 10.dp)
             ) {
@@ -384,7 +387,7 @@ fun ChatListScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(TelegramDarkBg)
+                    .background(com.example.ui.theme.TelegramGlassHeader)
                     .horizontalScroll(rememberScrollState())
                     .padding(horizontal = 12.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -439,10 +442,11 @@ fun ChatListScreen(
 
             // Bottom Navigation Bar
             NavigationBar(
-                containerColor = TelegramDarkBg,
+                containerColor = com.example.ui.theme.TelegramGlassHeader,
                 tonalElevation = 0.dp,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .border(0.8.dp, com.example.ui.theme.TelegramGlassBorder)
                     .navigationBarsPadding()
             ) {
                 NavigationBarItem(
@@ -542,21 +546,24 @@ fun ChatListScreen(
             }
         }
 
-        // Floating Action Button
-        FloatingActionButton(
-            onClick = onNewChatClick,
-            containerColor = TelegramPrimary,
-            contentColor = Color.White,
-            shape = CircleShape,
+        // Floating Action Button with Fluid Telegram Gradient & Glass Border
+        Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(bottom = 90.dp, end = 16.dp)
-                .size(54.dp)
+                .size(56.dp)
+                .shadow(10.dp, CircleShape, spotColor = Color(0x732481CC))
+                .clip(CircleShape)
+                .background(com.example.ui.theme.TelegramSendFabGradient)
+                .border(1.2.dp, Color(0x4DFFFFFF), CircleShape)
+                .clickable(onClick = onNewChatClick),
+            contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = Icons.Default.Edit,
                 contentDescription = "New Chat",
-                modifier = Modifier.size(22.dp)
+                tint = Color.White,
+                modifier = Modifier.size(24.dp)
             )
         }
     }
@@ -569,13 +576,25 @@ private fun CategoryPillTab(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
-    val bg = if (isSelected) Color(0xFF233244) else Color(0xFF16212D)
+    val pillShape = RoundedCornerShape(20.dp)
+    val bgBrush = if (isSelected) {
+        androidx.compose.ui.graphics.Brush.horizontalGradient(
+            listOf(Color(0xFF2B5C87), Color(0xFF1D4262))
+        )
+    } else {
+        androidx.compose.ui.graphics.Brush.horizontalGradient(
+            listOf(Color(0xA6182534), Color(0x80121C26))
+        )
+    }
+    val borderStroke = if (isSelected) Color(0x6652B8FF) else Color(0x24FFFFFF)
     val textColor = if (isSelected) Color.White else TelegramTextSecondary
 
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(18.dp))
-            .background(bg)
+            .shadow(if (isSelected) 3.dp else 0.dp, pillShape, spotColor = Color(0x552481CC))
+            .clip(pillShape)
+            .background(bgBrush)
+            .border(0.85.dp, borderStroke, pillShape)
             .clickable { onClick() }
             .padding(horizontal = 14.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically
