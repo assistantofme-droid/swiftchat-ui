@@ -411,19 +411,21 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 // If user picked an avatar image, upload it as multipart
                 if (!avatarUri.isNullOrBlank() && avatarUri!!.startsWith("content://")) {
                     try {
-                        val file = uriToFile(avatarUri) ?: return@try
-                        val mime = guessMime(avatarUri)
-                        val reqFile = file.asRequestBody(mime.toMediaTypeOrNull())
-                        val filePart = MultipartBody.Part.createFormData("file", file.name, reqFile)
-                        val avatarResp = ApiClient.service.updateProfileAvatar(filePart)
-                        if (avatarResp.isSuccessful && avatarResp.body() != null) {
-                            val avUser = avatarResp.body()!!
-                            sessionManager.avatar = avUser.avatar
-                            _uiState.update {
-                                it.copy(
-                                    currentUserAvatar = avUser.avatar ?: it.currentUserAvatar,
-                                    meUser = avUser
-                                )
+                        val file = uriToFile(avatarUri)
+                        if (file != null) {
+                            val mime = guessMime(avatarUri)
+                            val reqFile = file.asRequestBody(mime.toMediaTypeOrNull())
+                            val filePart = MultipartBody.Part.createFormData("file", file.name, reqFile)
+                            val avatarResp = ApiClient.service.updateProfileAvatar(filePart)
+                            if (avatarResp.isSuccessful && avatarResp.body() != null) {
+                                val avUser = avatarResp.body()!!
+                                sessionManager.avatar = avUser.avatar
+                                _uiState.update {
+                                    it.copy(
+                                        currentUserAvatar = avUser.avatar ?: it.currentUserAvatar,
+                                        meUser = avUser
+                                    )
+                                }
                             }
                         }
                     } catch (e: Exception) {
