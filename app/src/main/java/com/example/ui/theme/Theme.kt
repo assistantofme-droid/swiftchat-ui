@@ -5,6 +5,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
 // ============================================================
@@ -41,15 +42,22 @@ private val TelegramLightColorScheme = lightColorScheme(
     onSurfaceVariant = LightTextSecondary
 )
 
+val LocalAppStrings = staticCompositionLocalOf { EnglishStrings }
+
 @Composable
 fun MyApplicationTheme(
     isDarkMode: Boolean = true,
+    language: String = "fa",
     content: @Composable () -> Unit
 ) {
     val colorScheme = if (isDarkMode) TelegramDarkColorScheme else TelegramLightColorScheme
     val palette = if (isDarkMode) DarkPalette else LightPalette
+    val strings = stringsForLanguage(language)
 
-    CompositionLocalProvider(LocalAppPalette provides palette) {
+    CompositionLocalProvider(
+        LocalAppPalette provides palette,
+        LocalAppStrings provides strings
+    ) {
         MaterialTheme(
             colorScheme = colorScheme,
             typography = Typography,

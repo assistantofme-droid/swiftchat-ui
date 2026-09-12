@@ -81,8 +81,8 @@ fun TelegramApp(
     val uiState by viewModel.uiState.collectAsState()
     val callState by CallManager.callState.collectAsState()
 
-    // Theme follows the user's Dark/Light toggle.
-    MyApplicationTheme(isDarkMode = uiState.isDarkMode) {
+    // Theme follows the user's Dark/Light toggle + language preference.
+    MyApplicationTheme(isDarkMode = uiState.isDarkMode, language = uiState.language) {
         TelegramAppContent(viewModel = viewModel)
     }
 }
@@ -336,6 +336,7 @@ private fun TelegramAppContent(viewModel: ChatViewModel) {
                                 searchQuery = uiState.searchQuery,
                                 isDarkMode = uiState.isDarkMode,
                                 isRefreshing = uiState.isRefreshing,
+                                networkBannerMessage = uiState.networkBannerMessage,
                                 currentUserName = uiState.currentUserName,
                                 currentUserPhone = uiState.currentUserPhone,
                                 currentUserAvatar = uiState.currentUserAvatar,

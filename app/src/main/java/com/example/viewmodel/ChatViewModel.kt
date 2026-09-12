@@ -737,23 +737,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         )
         val subtitle = apiConv.lastMessage?.text ?: "No messages yet"
         val time = formatApiTime(apiConv.lastMessage?.createdAt ?: apiConv.lastMessageAt)
-
-        // unreadCount can be either a plain Int (sanitized endpoints) or a
-        // Map<userId, count> (raw Mongoose document). Handle both.
-        val unread = when (val uc = apiConv.unreadCount) {
-            is Number -> uc.toInt()
-            is Map<*, *> -> {
-                val key = currentUserId ?: ""
-                (uc[key] as? Number)?.toInt() ?: 0
-            }
-            is List<*> -> (uc.firstOrNull() as? Number)?.toInt() ?: 0
-            else -> 0
-        }
-
-        // isMuted can be a Boolean or derived from mutedBy array containing the user's id
-        val isMuted = apiConv.isMuted == true ||
-            (apiConv.mutedBy?.contains(currentUserId) == true)
-
+        // unreadCount is omitted from the model (server returns it as a Map
+        // which Moshi can't reliably parse). Default to 0.
+        val unread = 0
+        val isMuted = apiConv.isMuted == true
         val isPinned = apiConv.pinned == true
         val isGroup = apiConv.type != "private" && apiConv.type != "saved" && (apiConv.participants?.size ?: 0) > 2
         val isChannel = apiConv.isChannel == true || apiConv.type == "channel"

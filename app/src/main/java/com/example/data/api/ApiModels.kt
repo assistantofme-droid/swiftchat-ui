@@ -154,20 +154,18 @@ data class ApiConversation(
     @Json(name = "owner") val owner: ApiUser? = null,
     @Json(name = "admins") val admins: List<ApiUser>? = emptyList(),
     @Json(name = "lastMessage") val lastMessage: ApiLastMessage? = null,
-    // Server returns unreadCount as a Map<userId, count> (Mongoose Map type).
-    // Some endpoints sanitize it to a plain Int. We accept Any? and
-    // resolve it to an Int at the mapping layer. If we typed this as Int?,
-    // Moshi would throw JsonDataException when it encounters a JSON object
-    // and the ENTIRE response would fail to parse — which was the root
-    // cause of contacts click not opening the chat.
-    @Json(name = "unreadCount") val unreadCount: Any? = null,
+    // NOTE: unreadCount is intentionally OMITTED. The server stores it as a
+    // Mongoose Map<string, number> which serializes to a JSON object.
+    // @JsonClass(generateAdapter = true) cannot reliably handle Any? or
+    // Map<String, Any?>? for this field — it causes silent parse failures
+    // that make resp.body() return null, breaking ALL conversation endpoints.
+    // Moshi simply skips undeclared JSON fields, so omitting it is the
+    // safest approach. We default to 0 in the mapping layer.
     @Json(name = "isMuted") val isMuted: Boolean? = false,
     @Json(name = "pinned") val pinned: Boolean? = false,
     @Json(name = "lastMessageAt") val lastMessageAt: String? = null,
     @Json(name = "isChannel") val isChannel: Boolean? = false,
-    @Json(name = "isVerified") val isVerified: Boolean? = false,
-    @Json(name = "deletedBy") val deletedBy: List<String>? = null,
-    @Json(name = "mutedBy") val mutedBy: List<String>? = null
+    @Json(name = "isVerified") val isVerified: Boolean? = false
 )
 
 @JsonClass(generateAdapter = true)

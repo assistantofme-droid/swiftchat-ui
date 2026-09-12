@@ -96,6 +96,7 @@ fun ChatListScreen(
     searchQuery: String,
     isDarkMode: Boolean = true,
     isRefreshing: Boolean = false,
+    networkBannerMessage: String? = null,
     currentUserName: String? = null,
     currentUserPhone: String? = null,
     currentUserAvatar: String? = null,
@@ -250,6 +251,23 @@ fun ChatListScreen(
                             }
                         }
                     }
+                }
+            }
+
+            // Network error / status banner
+            if (!networkBannerMessage.isNullOrBlank()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFFF5252).copy(alpha = 0.15f))
+                        .clickable { }
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = networkBannerMessage,
+                        color = Color(0xFFFF8A80),
+                        fontSize = 13.sp
+                    )
                 }
             }
 
