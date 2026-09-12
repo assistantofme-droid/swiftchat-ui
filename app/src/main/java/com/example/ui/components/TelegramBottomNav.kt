@@ -1,12 +1,11 @@
 package com.example.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -16,14 +15,11 @@ import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -33,11 +29,26 @@ import com.example.data.model.AvatarType
 import com.example.ui.theme.appPalette
 
 /**
- * Floating glass bottom navigation — detached from the screen edge with
- * rounded pill shape, translucent glassy background, and subtle border.
- * Used by ChatList / Contacts / Settings / Profile screens.
+ * Floating glass bottom navigation bar.
+ *
+ * Designed to be placed as a floating overlay (NOT in a Scaffold bottomBar slot).
+ * It's a self-contained rounded pill with translucent glassy background, subtle
+ * border, and shadow elevation. The caller should wrap their screen content in
+ * a Box and place this at BottomCenter alignment with navigationBarsPadding.
  *
  * Tabs: 0=Chats, 1=Contacts, 2=Settings, 3=Profile
+ *
+ * Usage in a screen:
+ *   Box(Modifier.fillMaxSize()) {
+ *       // screen content here
+ *       TelegramBottomNav(
+ *           selectedIndex = ...,
+ *           onSelect = ...,
+ *           modifier = Modifier
+ *               .align(Alignment.BottomCenter)
+ *               .navigationBarsPadding()
+ *       )
+ *   }
  */
 @Composable
 fun TelegramBottomNav(
@@ -50,19 +61,17 @@ fun TelegramBottomNav(
     val palette = appPalette
 
     Surface(
-        color = palette.glassHeader.copy(alpha = 0.85f),
+        color = palette.glassHeader.copy(alpha = 0.92f),
         shape = RoundedCornerShape(28.dp),
         shadowElevation = 12.dp,
         tonalElevation = 0.dp,
         modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .border(1.dp, palette.glassBorder, RoundedCornerShape(28.dp))
+            .padding(horizontal = 16.dp, vertical = 10.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 4.dp, vertical = 4.dp),
+                .padding(horizontal = 8.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {

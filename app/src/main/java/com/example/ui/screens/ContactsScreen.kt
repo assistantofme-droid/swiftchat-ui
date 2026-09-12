@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -145,21 +146,13 @@ fun ContactsScreen(
         containerColor = appPalette.chatListBg,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = { ContactsHeader() },
-        bottomBar = {
-            TelegramBottomNav(
-                selectedIndex = selectedBottomNavIndex,
-                onSelect = onSelectBottomNav,
-                currentUserAvatarUrl = currentUserAvatarUrl,
-                modifier = Modifier.fillMaxWidth()
-            )
-        },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { showAddDialog = true },
                 containerColor = appPalette.primary,
                 contentColor = Color.White,
                 shape = CircleShape,
-                modifier = Modifier.padding(bottom = 16.dp)
+                modifier = Modifier.padding(bottom = 72.dp)
             ) {
                 Icon(Icons.Default.PersonAdd, contentDescription = "Add contact")
             }
@@ -228,11 +221,21 @@ fun ContactsScreen(
                             items(filtered, key = { it._id ?: it.username ?: it.phone ?: it.name ?: "" }) { contact ->
                                 ContactRow(contact = contact, onClick = { onContactClick(contact) })
                             }
-                            item { Spacer(modifier = Modifier.height(80.dp)) }
+                            item { Spacer(modifier = Modifier.height(100.dp)) }
                         }
                     }
                 }
             }
+
+            // Floating glass bottom nav overlay
+            TelegramBottomNav(
+                selectedIndex = selectedBottomNavIndex,
+                onSelect = onSelectBottomNav,
+                currentUserAvatarUrl = currentUserAvatarUrl,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+            )
         }
     }
 

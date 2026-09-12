@@ -41,9 +41,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -139,7 +136,6 @@ fun ChatListScreen(
     val pinColor = if (isDarkMode) TelegramPinIcon else LightPinIcon
     val checkBlue = if (isDarkMode) TelegramCheckBlue else LightCheckBlue
     val typingCyan = if (isDarkMode) TelegramTypingCyan else LightTypingCyan
-    val indicatorColor = if (isDarkMode) Color(0xFF1E2D3D) else Color(0xFFD6E9F7)
     val menuBg = if (isDarkMode) TelegramDarkBg else LightSurface
 
     Box(
@@ -294,7 +290,8 @@ fun ChatListScreen(
                 state = listState,
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxWidth()
+                    .fillMaxWidth(),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 100.dp)
             ) {
                 items(filteredChats, key = { it.id }) { chat ->
                     ChatListItem(
@@ -304,117 +301,18 @@ fun ChatListScreen(
                     )
                 }
             }
-
-            // Bottom Navigation Bar
-            NavigationBar(
-                containerColor = headerBg,
-                tonalElevation = 0.dp,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(0.8.dp, headerBorder)
-                    .navigationBarsPadding()
-            ) {
-                NavigationBarItem(
-                    selected = selectedBottomNavIndex == 0,
-                    onClick = { onBottomNavSelect(0) },
-                    icon = {
-                        Box {
-                            Icon(
-                                imageVector = Icons.Default.Chat,
-                                contentDescription = "Chats",
-                                modifier = Modifier.size(24.dp)
-                            )
-                            // Real unread badge = total of all chat unread counts
-                            val totalUnread = chats.sumOf { it.unreadCount }
-                            if (totalUnread > 0) {
-                                Box(
-                                    modifier = Modifier
-                                        .align(Alignment.TopEnd)
-                                        .background(badgeColor, RoundedCornerShape(10.dp))
-                                        .padding(horizontal = 4.dp, vertical = 1.dp)
-                                ) {
-                                    Text(
-                                        text = if (totalUnread > 999) "999+" else totalUnread.toString(),
-                                        color = badgeTextColor,
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
-                    },
-                    label = { Text("Chats", fontSize = 11.sp) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = primaryColor,
-                        selectedTextColor = primaryColor,
-                        indicatorColor = indicatorColor,
-                        unselectedIconColor = textSecondary,
-                        unselectedTextColor = textSecondary
-                    )
-                )
-
-                NavigationBarItem(
-                    selected = selectedBottomNavIndex == 1,
-                    onClick = { onBottomNavSelect(1) },
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Default.People,
-                            contentDescription = "Contacts",
-                            modifier = Modifier.size(24.dp)
-                        )
-                    },
-                    label = { Text("Contacts", fontSize = 11.sp) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = primaryColor,
-                        selectedTextColor = primaryColor,
-                        indicatorColor = indicatorColor,
-                        unselectedIconColor = textSecondary,
-                        unselectedTextColor = textSecondary
-                    )
-                )
-
-                NavigationBarItem(
-                    selected = selectedBottomNavIndex == 2,
-                    onClick = { onBottomNavSelect(2) },
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Settings",
-                            modifier = Modifier.size(24.dp)
-                        )
-                    },
-                    label = { Text("Settings", fontSize = 11.sp) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = primaryColor,
-                        selectedTextColor = primaryColor,
-                        indicatorColor = indicatorColor,
-                        unselectedIconColor = textSecondary,
-                        unselectedTextColor = textSecondary
-                    )
-                )
-
-                NavigationBarItem(
-                    selected = selectedBottomNavIndex == 3,
-                    onClick = { onBottomNavSelect(3) },
-                    icon = {
-                        AvatarView(
-                            avatarUrl = currentUserAvatar,
-                            title = currentUserName,
-                            size = 26.dp
-                        )
-                    },
-                    label = { Text("Profile", fontSize = 11.sp) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = primaryColor,
-                        selectedTextColor = primaryColor,
-                        indicatorColor = indicatorColor,
-                        unselectedIconColor = textSecondary,
-                        unselectedTextColor = textSecondary
-                    )
-                )
-            }
         }
 
+        // Floating glass bottom nav overlay — same component used by all screens
+        com.example.ui.components.TelegramBottomNav(
+            selectedIndex = selectedBottomNavIndex,
+            onSelect = onBottomNavSelect,
+            chatsBadgeCount = chats.sumOf { it.unreadCount },
+            currentUserAvatarUrl = currentUserAvatar,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+        )
     }
 }
 

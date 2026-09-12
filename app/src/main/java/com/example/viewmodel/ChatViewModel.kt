@@ -2128,49 +2128,56 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
      * Open a private chat with the given contact by their userId.
      * Uses POST /messages/contacts — the server's dedicated "find or create
      * private chat with this user" endpoint (addContact controller).
-     * This is more reliable than GET /messages/conversations/{id} which
-     * first tries to match by conversation _id/handle before falling back
-     * to user lookup.
      *
-     * After getting the conversation, force-switches to the Chats tab and
-     * selects the chat so ChatDetailScreen renders immediately.
+     * After getting the conversation:
+     *   1. Add it to the chats list (or update if already present)
+     *   2. Switch to Chats tab (selectedBottomNavIndex = 0)
+     *   3. Set selectedChatId so ChatDetailScreen renders
+     *   4. Fetch messages for the conversation
+     *
+     * All state changes happen in ONE _uiState.update call to avoid race
+     * conditions between ChatDetailScreen looking up the chat in the list
+     * and the list being updated.
      */
     fun openPrivateChatWithContact(userId: String) {
         viewModelScope.launch {
             try {
+                Log.d("ChatViewModel", "openPrivateChatWithContact: userId=$userId")
                 // POST /messages/contacts with { userId: contactUserId }
-                // Server finds/creates the private conversation and returns it.
                 val resp = ApiClient.service.startPrivateChatWithContact(
                     AddContactRequest(userId = userId)
                 )
-                if (resp.isSuccessful && resp.body() != null) {
-                    val conv = resp.body()!!
-                    val chatItem = mapApiConversationToChatItem(conv)
-                    // Update chats list + switch to Chats tab in ONE state update
-                    // so the UI re-renders atomically with the chat already in
-                    // the list when ChatDetailScreen tries to find it.
-                    _uiState.update { state ->
-                        state.copy(
-                            chats = if (state.chats.none { it.id == chatItem.id }) {
-                                listOf(chatItem) + state.chats
-                            } else {
-                                state.chats.map { if (it.id == chatItem.id) chatItem else it }
-                            },
-                            selectedBottomNavIndex = 0,
-                            selectedChatId = chatItem.id
-                        )
-                    }
-                    // Now fetch messages for this conversation
-                    fetchMessages(chatItem.id)
-                    startMessagePolling(chatItem.id)
-                    markConversationAsRead(chatItem.id)
-                } else {
+                if (!resp.isSuccessful || resp.body() == null) {
                     val err = parseErrorBody(resp.errorBody())
-                    Log.e("ChatViewModel", "openPrivateChatWithContact failed: ${resp.code()} $err")
+                    Log.e("ChatViewModel", "openPrivateChatWithContact API failed: ${resp.code()} $err")
                     _uiState.update {
                         it.copy(networkBannerMessage = "Couldn't open chat: ${err ?: "code ${resp.code()}"}")
                     }
+                    return@launch
                 }
+
+                val conv = resp.body()!!
+                Log.d("ChatViewModel", "openPrivateChatWithContact: got conversation ${conv._id} type=${conv.type} participants=${conv.participants?.size}")
+                val chatItem = mapApiConversationToChatItem(conv)
+
+                // Single atomic state update: add chat + switch tab + select chat
+                _uiState.update { state ->
+                    state.copy(
+                        chats = if (state.chats.none { it.id == chatItem.id }) {
+                            listOf(chatItem) + state.chats
+                        } else {
+                            state.chats.map { if (it.id == chatItem.id) chatItem else it }
+                        },
+                        selectedBottomNavIndex = 0,
+                        selectedChatId = chatItem.id,
+                        currentMessages = emptyList() // clear previous chat's messages
+                    )
+                }
+
+                // Now fetch messages for this conversation (fires off its own coroutine)
+                fetchMessages(chatItem.id)
+                startMessagePolling(chatItem.id)
+                markConversationAsRead(chatItem.id)
             } catch (e: Exception) {
                 Log.e("ChatViewModel", "openPrivateChatWithContact error", e)
                 _uiState.update {

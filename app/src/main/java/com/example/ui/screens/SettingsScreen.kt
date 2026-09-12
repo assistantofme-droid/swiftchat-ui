@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -91,21 +92,16 @@ fun SettingsScreen(
                 }
             }
         },
-        bottomBar = {
-            TelegramBottomNav(
-                selectedIndex = selectedBottomNavIndex,
-                onSelect = onSelectBottomNav,
-                currentUserAvatarUrl = currentUserAvatarUrl,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
     ) { padding ->
-        LazyColumn(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 12.dp)
+                .padding(padding)
         ) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 12.dp)
+            ) {
             // === Main settings card ===
             item {
                 SettingsCard {
@@ -207,7 +203,18 @@ fun SettingsScreen(
                 }
             }
 
-            item { Spacer(modifier = Modifier.height(80.dp)) }
+            item { Spacer(modifier = Modifier.height(100.dp)) }
+            }
+
+            // Floating glass bottom nav overlay
+            TelegramBottomNav(
+                selectedIndex = selectedBottomNavIndex,
+                onSelect = onSelectBottomNav,
+                currentUserAvatarUrl = currentUserAvatarUrl,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+            )
         }
     }
 }
