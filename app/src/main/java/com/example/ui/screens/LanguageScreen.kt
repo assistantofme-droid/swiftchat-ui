@@ -31,14 +31,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+
 data class LanguageOption(
     val code: String,
     val nativeName: String,
     val englishName: String
 )
+
 private val LANGUAGES = listOf(
     LanguageOption("fa", "فارسی", "Persian"),
     LanguageOption("en", "English", "English")
+)
+
 @Composable
 fun LanguageScreen(
     selectedLanguage: String,
@@ -87,24 +91,39 @@ fun LanguageScreen(
                                     color = appPalette.textPrimary,
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Medium
+                                )
+                                Text(
                                     text = lang.englishName,
                                     color = appPalette.textSecondary,
                                     fontSize = 13.sp
+                                )
+                            }
                             if (lang.code == selectedLanguage) {
+                                Icon(
                                     imageVector = Icons.Default.Check,
                                     contentDescription = "Selected",
+                                    tint = appPalette.primary,
                                     modifier = Modifier.size(24.dp)
+                                )
+                            }
                         }
                         if (index < LANGUAGES.size - 1) {
+                            Box(
+                                modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 16.dp)
                                     .height(0.5.dp)
                                     .background(appPalette.textSecondary.copy(alpha = 0.2f))
                             )
+                        }
                     }
                 }
             }
+
             item { Spacer(modifier = Modifier.height(12.dp)) }
+
+            item {
+                SettingsCard {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -116,6 +135,10 @@ fun LanguageScreen(
                             color = appPalette.textSecondary,
                             fontSize = 13.sp
                         )
+                    }
+                }
+            }
+
             item { Spacer(modifier = Modifier.height(80.dp)) }
         }
     }

@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+
 @Composable
 fun PowerSavingScreen(
     powerSavingEnabled: Boolean,
@@ -61,28 +62,45 @@ fun PowerSavingScreen(
                     )
                 }
             }
+
             item { Spacer(modifier = Modifier.height(12.dp)) }
+
             // === Individual options ===
+            item {
+                SettingsCard {
                     SectionHeader("Reduction Options")
+                    ToggleRow(
                         icon = Icons.Default.HighQuality,
                         iconColor = Color(0xFF5DADE2),
                         title = "Lower Media Quality",
                         subtitle = "Download compressed images and videos",
                         checked = powerLowQuality,
                         onCheckedChange = onSetLowQuality
+                    )
+                    ToggleRow(
                         icon = Icons.Default.Animation,
                         iconColor = Color(0xFFF39C12),
                         title = "Disable Animations",
                         subtitle = "Turn off bubble, transition and sticker animations",
                         checked = powerDisableAnimations,
                         onCheckedChange = onSetDisableAnimations
+                    )
+                    ToggleRow(
                         icon = Icons.Default.PlayCircle,
                         iconColor = Color(0xFFEC7063),
                         title = "Disable Auto-Play",
                         subtitle = "Stop GIFs and videos from playing automatically",
                         checked = powerDisableAutoplay,
                         onCheckedChange = onSetDisableAutoplay
+                    )
+                }
+            }
+
+            item { Spacer(modifier = Modifier.height(12.dp)) }
+
             // === Info card ===
+            item {
+                SettingsCard {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -96,13 +114,18 @@ fun PowerSavingScreen(
                                 fontWeight = FontWeight.SemiBold
                             )
                             Spacer(modifier = Modifier.height(6.dp))
+                            Text(
                                 text = "When enabled, 7eve9Chat will reduce network polling, " +
                                     "lower media quality, and skip animations to save battery. " +
                                     "Messages may take a few seconds longer to arrive.",
                                 color = appPalette.textSecondary,
                                 fontSize = 13.sp
+                            )
                         }
                     }
+                }
+            }
+
             item { Spacer(modifier = Modifier.height(80.dp)) }
         }
     }

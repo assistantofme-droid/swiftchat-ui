@@ -54,13 +54,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.ui.components.AvatarView
-import com.example.ui.theme.appPalette.bg
-import com.example.ui.theme.appPalette.primary
-import com.example.ui.theme.appPalette.surface
-import com.example.ui.theme.appPalette.surfaceVariant
-import com.example.ui.theme.appPalette.textMuted
-import com.example.ui.theme.appPalette.textPrimary
-import com.example.ui.theme.appPalette.textSecondary
 
 /**
  * First-time setup screen — shown when isNewUser=true OR when the user has no

@@ -47,11 +47,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+
 data class ChatFolder(
     val id: String,
     val name: String,
     val isDefault: Boolean = false
 )
+
 @Composable
 fun ChatFoldersScreen(
     folders: List<ChatFolder>,
@@ -63,6 +65,7 @@ fun ChatFoldersScreen(
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
     var newFolderName by remember { mutableStateOf("") }
+
     // Recommended folders — preset suggestions the user can add in one tap
     val recommendedFolders = remember {
         listOf(
@@ -73,6 +76,7 @@ fun ChatFoldersScreen(
             ChatFolder(id = "rec_bots", name = "Bots")
         )
     }.filter { rec -> folders.none { it.name.equals(rec.name, ignoreCase = true) } }
+
     Scaffold(
         containerColor = appPalette.chatListBg,
         topBar = { SettingsTopBar(title = "Chat Folders", onBack = onBack) }
@@ -114,6 +118,7 @@ fun ChatFoldersScreen(
                     )
                 }
             }
+
             // === Recommended Folders ===
             if (recommendedFolders.isNotEmpty()) {
                 item {
@@ -134,9 +139,11 @@ fun ChatFoldersScreen(
                                         fontWeight = FontWeight.Medium
                                     )
                                     Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
                                         text = folderDescription(folder.name),
                                         color = appPalette.textSecondary,
                                         fontSize = 13.sp
+                                    )
                                 }
                                 Button(
                                     onClick = { onAddFolder(folder.name) },
@@ -147,15 +154,24 @@ fun ChatFoldersScreen(
                                     contentPadding = androidx.compose.foundation.layout.PaddingValues(
                                         horizontal = 20.dp,
                                         vertical = 6.dp
+                                    )
                                 ) {
+                                    Text(
                                         text = "Add",
                                         color = Color.White,
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
                         }
+                    }
+                }
                 item { Spacer(modifier = Modifier.height(12.dp)) }
+            }
+
             // === Custom folders ===
+            item {
                 SettingsCard {
                     SectionHeader("Your Folders")
                     if (folders.isEmpty()) {
@@ -164,6 +180,7 @@ fun ChatFoldersScreen(
                             color = appPalette.textSecondary,
                             fontSize = 14.sp,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)
+                        )
                     } else {
                         folders.forEachIndexed { index, folder ->
                             FolderRow(
@@ -178,21 +195,39 @@ fun ChatFoldersScreen(
                                         .height(0.5.dp)
                                         .background(appPalette.textMuted.copy(alpha = 0.2f))
                                 )
+                            }
+                        }
+                    }
                     // Create new folder row
                     Row(
+                        modifier = Modifier
                             .fillMaxWidth()
                             .clickable { showCreateDialog = true }
                             .padding(horizontal = 16.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
                             imageVector = Icons.Default.Add,
+                            contentDescription = null,
+                            tint = appPalette.primary,
                             modifier = Modifier.size(24.dp)
+                        )
                         Spacer(modifier = Modifier.width(16.dp))
+                        Text(
                             text = "Create New Folder",
                             color = appPalette.primary,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
             item { Spacer(modifier = Modifier.height(12.dp)) }
+
             // === Show Folder Tags toggle ===
+            item {
+                SettingsCard {
                     ToggleRow(
                         icon = Icons.Default.Folder,
                         iconColor = appPalette.primary,
@@ -200,9 +235,14 @@ fun ChatFoldersScreen(
                         subtitle = "Display folder names for each chat in the chat list",
                         checked = showFolderTags,
                         onCheckedChange = onToggleFolderTags
+                    )
+                }
+            }
+
             item { Spacer(modifier = Modifier.height(80.dp)) }
         }
     }
+
     // Create folder dialog
     if (showCreateDialog) {
         AlertDialog(
@@ -228,21 +268,33 @@ fun ChatFoldersScreen(
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
                         if (newFolderName.isNotBlank()) {
                             onAddFolder(newFolderName.trim())
                             newFolderName = ""
+                        }
                         showCreateDialog = false
+                    }
+                ) {
                     Text("Create", color = appPalette.primary, fontWeight = FontWeight.SemiBold)
+                }
+            },
             dismissButton = {
                 TextButton(onClick = {
                     showCreateDialog = false
                     newFolderName = ""
                 }) {
                     Text("Cancel", color = appPalette.textSecondary)
+                }
+            }
+        )
+    }
 }
+
+@Composable
 private fun FolderRow(folder: ChatFolder, onDelete: () -> Unit) {
     Row(
         modifier = Modifier
@@ -255,6 +307,7 @@ private fun FolderRow(folder: ChatFolder, onDelete: () -> Unit) {
             contentDescription = "Drag",
             tint = appPalette.textMuted,
             modifier = Modifier.size(24.dp)
+        )
         Spacer(modifier = Modifier.width(16.dp))
         Text(
             text = folder.name,
@@ -262,11 +315,18 @@ private fun FolderRow(folder: ChatFolder, onDelete: () -> Unit) {
             fontSize = 16.sp,
             fontWeight = FontWeight.Medium,
             modifier = Modifier.weight(1f)
+        )
+        Icon(
             imageVector = Icons.Default.MoreVert,
             contentDescription = "More",
             tint = appPalette.textSecondary,
+            modifier = Modifier
                 .size(24.dp)
                 .clickable(onClick = onDelete)
+        )
+    }
+}
+
 private fun folderDescription(name: String): String = when {
     name.equals("Unread", ignoreCase = true) -> "New messages from all chats."
     name.equals("Personal", ignoreCase = true) -> "One-on-one private conversations."
@@ -274,3 +334,4 @@ private fun folderDescription(name: String): String = when {
     name.equals("Channels", ignoreCase = true) -> "Channels you're subscribed to."
     name.equals("Bots", ignoreCase = true) -> "Conversations with bots."
     else -> "Custom folder"
+}
