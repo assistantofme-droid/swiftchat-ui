@@ -1,13 +1,20 @@
 package com.example.viewmodel
 
 import android.app.Application
+import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.R
 import com.example.data.api.ApiClient
 import com.example.data.api.ApiConversation
+import com.example.data.api.ApiLocation
 import com.example.data.api.ApiMessage
+import com.example.data.api.ApiPoll
+import com.example.data.api.ApiPollOption
+import com.example.data.api.EditMessageRequest
+import com.example.data.api.ForwardMessageRequest
+import com.example.data.api.PinMessageRequest
+import com.example.data.api.PollVoteRequest
 import com.example.data.api.ReactionRequest
 import com.example.data.api.SendMessageRequest
 import com.example.data.api.SendOtpRequest
@@ -31,6 +38,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -97,17 +110,47 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         loadStickersAndGifs()
 
         if (loggedIn) {
+            // Refresh current user profile from /auth/me to keep local session in sync
+            bootstrapCurrentUser()
             refreshConversations()
             startConversationsPolling()
-        } else {
-            // Preload sample chats so UI has rich visuals if guest mode is used
-            loadFallbackChats()
         }
     }
 
-    // -------------------------------------------------------------
+    // =============================================================
     // Authentication Flow
-    // -------------------------------------------------------------
+    // =============================================================
+
+    /** Refresh the current user from /auth/me and persist into SessionManager. */
+    private fun bootstrapCurrentUser() {
+        viewModelScope.launch {
+            try {
+                val resp = ApiClient.service.getMe()
+                if (resp.isSuccessful && resp.body() != null) {
+                    val u = resp.body()!!
+                    sessionManager.saveSession(
+                        token = sessionManager.token ?: return@launch,
+                        id = u._id ?: sessionManager.userId,
+                        phone = u.phone ?: sessionManager.phone,
+                        name = u.name ?: sessionManager.name,
+                        username = u.username ?: sessionManager.username,
+                        avatar = u.avatar ?: sessionManager.avatar,
+                        bio = u.bio ?: sessionManager.bio
+                    )
+                    _uiState.update {
+                        it.copy(
+                            currentUserName = u.name ?: it.currentUserName,
+                            currentUserPhone = u.phone ?: it.currentUserPhone,
+                            currentUserAvatar = u.avatar ?: it.currentUserAvatar,
+                            currentUserBio = u.bio ?: it.currentUserBio
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("ChatViewModel", "bootstrapCurrentUser: ${e.message}")
+            }
+        }
+    }
 
     fun sendOtp(phone: String) {
         _uiState.update { it.copy(isAuthLoading = true, authErrorMessage = null) }
@@ -124,7 +167,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         )
                     }
                 } else {
-                    val err = response.errorBody()?.string() ?: "Failed to send code (${response.code()})"
+                    val err = parseErrorBody(response.errorBody()) ?: "Failed to send code (${response.code()})"
                     _uiState.update {
                         it.copy(
                             isAuthLoading = false,
@@ -161,7 +204,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         phone = user?.phone ?: cleanPhone,
                         name = user?.name ?: "User",
                         username = user?.username,
-                        avatar = user?.avatar
+                        avatar = user?.avatar,
+                        bio = user?.bio
                     )
 
                     ApiClient.setTokenProvider { token }
@@ -173,14 +217,19 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                             authErrorMessage = null,
                             currentUserName = user?.name ?: "User",
                             currentUserPhone = user?.phone ?: cleanPhone,
-                            currentUserAvatar = user?.avatar
+                            currentUserAvatar = user?.avatar,
+                            currentUserBio = user?.bio
                         )
                     }
 
+                    // Pull full profile + chats from server now that we have a token
+                    bootstrapCurrentUser()
                     refreshConversations()
                     startConversationsPolling()
                 } else {
-                    val err = response.errorBody()?.string() ?: "Invalid OTP verification code (${response.code()})"
+                    val err = parseErrorBody(response.errorBody())
+                        ?: response.body()?.message
+                        ?: "Invalid OTP verification code (${response.code()})"
                     _uiState.update {
                         it.copy(
                             isAuthLoading = false,
@@ -212,52 +261,58 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     fun logout() {
         sessionManager.clearSession()
+        messagePollingJob?.cancel()
+        conversationPollingJob?.cancel()
         _uiState.update {
             it.copy(
                 isAuthenticated = false,
                 currentUserName = null,
                 currentUserPhone = null,
                 currentUserAvatar = null,
-                selectedChatId = null
+                currentUserBio = null,
+                selectedChatId = null,
+                chats = emptyList(),
+                currentMessages = emptyList()
             )
         }
     }
 
-    // -------------------------------------------------------------
+    // =============================================================
     // Conversations API
-    // -------------------------------------------------------------
+    // =============================================================
 
     fun refreshConversations() {
-        _uiState.update { it.copy(isRefreshing = true) }
+        _uiState.update { it.copy(isRefreshing = true, networkBannerMessage = null) }
         viewModelScope.launch {
             try {
+                // Prefer /messages/conversations (which is the per-user list with lastMessage);
+                // fall back to /conversations if the server only has the latter mounted.
                 val response = try {
-                    val r1 = ApiClient.service.getConversations()
-                    if (r1.isSuccessful && r1.body() != null) r1
-                    else ApiClient.service.getConversationsAlt()
+                    val r1 = ApiClient.service.getConversationsAlt()
+                    if (r1.isSuccessful && !r1.body().isNullOrEmpty()) r1
+                    else ApiClient.service.getConversations()
                 } catch (e: Exception) {
-                    ApiClient.service.getConversationsAlt()
+                    ApiClient.service.getConversations()
                 }
 
-                if (response.isSuccessful && response.body() != null) {
+                if (response.isSuccessful && !response.body().isNullOrEmpty()) {
                     val apiConversations = response.body()!!
-                    val mappedChats = apiConversations.map { apiConv ->
-                        mapApiConversationToChatItem(apiConv)
-                    }
+                    val mappedChats = apiConversations.map { mapApiConversationToChatItem(it) }
 
                     _uiState.update { state ->
                         state.copy(
-                            chats = if (mappedChats.isNotEmpty()) mappedChats else state.chats.ifEmpty { fallbackChatsList() },
+                            chats = mappedChats,
                             isRefreshing = false,
                             networkBannerMessage = null
                         )
                     }
                 } else {
-                    // Fallback to existing or mock if empty
+                    val code = response.code()
                     _uiState.update { state ->
                         state.copy(
-                            chats = state.chats.ifEmpty { fallbackChatsList() },
-                            isRefreshing = false
+                            isRefreshing = false,
+                            networkBannerMessage = if (state.chats.isEmpty())
+                                "No conversations yet (${code})" else null
                         )
                     }
                 }
@@ -265,9 +320,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 Log.e("ChatViewModel", "refreshConversations error", e)
                 _uiState.update { state ->
                     state.copy(
-                        chats = state.chats.ifEmpty { fallbackChatsList() },
                         isRefreshing = false,
-                        networkBannerMessage = "Offline mode - showing cached chats"
+                        networkBannerMessage = if (state.chats.isEmpty())
+                            "Network error: ${e.localizedMessage ?: "check connection"}" else null
                     )
                 }
             }
@@ -281,12 +336,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 delay(12000) // Poll every 12 seconds
                 if (_uiState.value.selectedChatId == null && _uiState.value.isAuthenticated) {
                     try {
-                        val resp = ApiClient.service.getConversations()
-                        if (resp.isSuccessful && resp.body() != null && resp.body()!!.isNotEmpty()) {
-                            val mapped = resp.body()!!.map { mapApiConversationToChatItem(it) }
+                        val resp = ApiClient.service.getConversationsAlt()
+                        val body = if (resp.isSuccessful) resp.body() else null
+                        if (!body.isNullOrEmpty()) {
+                            val mapped = body.map { mapApiConversationToChatItem(it) }
                             _uiState.update { it.copy(chats = mapped) }
                         }
-                    } catch (_: Exception) {}
+                    } catch (_: Exception) {
+                        // silent — network blips during polling shouldn't toast
+                    }
                 }
             }
         }
@@ -301,15 +359,19 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             !otherParticipant?.name.isNullOrBlank() -> otherParticipant?.name!!
             !otherParticipant?.user?.name.isNullOrBlank() -> otherParticipant?.user?.name!!
             !otherParticipant?.user?.username.isNullOrBlank() -> otherParticipant?.user?.username!!
-            else -> "Telegram User"
+            else -> "7eve9Chat User"
         }
 
-        val avatar = apiConv.avatar ?: otherParticipant?.avatar ?: otherParticipant?.user?.avatar
-        val subtitle = apiConv.lastMessage?.text ?: "No messages"
+        val avatar = ApiClient.resolveUrl(
+            apiConv.avatar ?: otherParticipant?.avatar ?: otherParticipant?.user?.avatar
+        )
+        val subtitle = apiConv.lastMessage?.text ?: "No messages yet"
         val time = formatApiTime(apiConv.lastMessage?.createdAt ?: apiConv.lastMessageAt)
         val unread = apiConv.unreadCount ?: 0
         val isPinned = apiConv.pinned == true
         val isMuted = apiConv.isMuted == true
+        val isGroup = apiConv.type != "private" && (apiConv.participants?.size ?: 0) > 2
+        val isChannel = apiConv.isChannel == true || apiConv.type == "channel"
 
         return ChatItem(
             id = apiConv._id,
@@ -320,13 +382,16 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             unreadCount = unread,
             isMuted = isMuted,
             avatarUrl = avatar,
-            avatarType = AvatarType.MOTORCYCLE
+            avatarType = AvatarType.MOTORCYCLE,
+            isGroup = isGroup,
+            memberCount = apiConv.participants?.size ?: 0,
+            isOnline = false
         )
     }
 
-    // -------------------------------------------------------------
+    // =============================================================
     // Messages API
-    // -------------------------------------------------------------
+    // =============================================================
 
     fun selectChat(chatId: String?) {
         _uiState.update { it.copy(selectedChatId = chatId) }
@@ -336,6 +401,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             fetchMessages(chatId)
             startMessagePolling(chatId)
             markConversationAsRead(chatId)
+        } else {
+            _uiState.update { it.copy(currentMessages = emptyList()) }
         }
     }
 
@@ -348,15 +415,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     val mappedMessages = apiMessages.map { mapApiMessageToItem(it) }
 
                     _uiState.update { state ->
-                        state.copy(
-                            currentMessages = if (mappedMessages.isNotEmpty()) mappedMessages else defaultMessagesList()
-                        )
+                        state.copy(currentMessages = mappedMessages)
                     }
                 } else {
-                    // Fallback to default message list if empty
+                    val err = parseErrorBody(response.errorBody())
                     _uiState.update { state ->
                         state.copy(
-                            currentMessages = if (state.currentMessages.isEmpty()) defaultMessagesList() else state.currentMessages
+                            currentMessages = emptyList(),
+                            networkBannerMessage = "Failed to load messages (${response.code()}): ${err ?: "unknown"}"
                         )
                     }
                 }
@@ -364,7 +430,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 Log.e("ChatViewModel", "fetchMessages error", e)
                 _uiState.update { state ->
                     state.copy(
-                        currentMessages = if (state.currentMessages.isEmpty()) defaultMessagesList() else state.currentMessages
+                        currentMessages = emptyList(),
+                        networkBannerMessage = "Network error loading messages: ${e.localizedMessage ?: "check connection"}"
                     )
                 }
             }
@@ -381,11 +448,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         val response = ApiClient.service.getMessages(conversationId, page = 1, limit = 50)
                         if (response.isSuccessful && response.body() != null) {
                             val mapped = response.body()!!.map { mapApiMessageToItem(it) }
-                            if (mapped.isNotEmpty()) {
-                                _uiState.update { it.copy(currentMessages = mapped) }
-                            }
+                            _uiState.update { it.copy(currentMessages = mapped) }
                         }
-                    } catch (_: Exception) {}
+                    } catch (_: Exception) {
+                        // silent — polling errors should not spam the user
+                    }
                 }
             }
         }
@@ -411,6 +478,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             "audio", "voice" -> MessageType.AUDIO
             "gif" -> MessageType.GIF
             "sticker" -> MessageType.BIG_STICKER
+            "file" -> MessageType.FILE
+            "location" -> MessageType.LOCATION
+            "poll" -> MessageType.POLL
+            "album_group", "album" -> MessageType.IMAGE_COLLAGE
             else -> MessageType.TEXT
         }
 
@@ -418,20 +489,28 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             ReactionItem(emoji = it.emoji, userAvatarType = AvatarType.MOTORCYCLE)
         } ?: emptyList()
 
+        // Determine read state: outgoing messages are "read" if any readBy entry isn't the sender;
+        // incoming messages are always considered read once displayed.
+        val isRead = when {
+            apiMsg.readBy.isNullOrEmpty() -> false
+            isOutgoing -> apiMsg.readBy!!.any { it != currentUserId }
+            else -> true
+        }
+
         return MessageItem(
             id = apiMsg._id,
             text = apiMsg.text,
             time = formatApiTime(apiMsg.createdAt),
             isOutgoing = isOutgoing,
             type = type,
-            mediaUrl = apiMsg.fileUrl,
-            videoThumbnailUrl = apiMsg.videoThumbnailUrl,
-            duration = apiMsg.duration,
+            mediaUrl = ApiClient.resolveUrl(apiMsg.fileUrl),
+            videoThumbnailUrl = ApiClient.resolveUrl(apiMsg.videoThumbnailUrl),
+            duration = apiMsg.duration ?: apiMsg.audioMetadata?.duration,
             fileName = apiMsg.fileName,
             senderName = if (!isOutgoing) apiMsg.sender?.name ?: apiMsg.sender?.username else null,
-            senderAvatarUrl = apiMsg.sender?.avatar,
+            senderAvatarUrl = ApiClient.resolveUrl(apiMsg.sender?.avatar),
             reactions = reactions,
-            isRead = !apiMsg.readBy.isNullOrEmpty()
+            isRead = isRead
         )
     }
 
@@ -464,7 +543,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
 
-        // Call real API
+        // Real API call
         viewModelScope.launch {
             try {
                 val req = SendMessageRequest(
@@ -479,37 +558,112 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
                     _uiState.update { state ->
                         val updated = state.currentMessages.map {
-                            if (it.id == tempId) mapped.copy(isOutgoing = true, isRead = false) else it
+                            if (it.id == tempId) mapped else it
                         }
                         state.copy(currentMessages = updated)
                     }
+                } else {
+                    // Mark local message as failed (still show it, but update state)
+                    val err = parseErrorBody(response.errorBody())
+                    Log.e("ChatViewModel", "sendMessage failed: ${response.code()} $err")
+                    _uiState.update { state ->
+                        state.copy(
+                            networkBannerMessage = "Failed to send message (${response.code()})"
+                        )
+                    }
                 }
             } catch (e: Exception) {
-                Log.e("ChatViewModel", "sendMessage API failed, kept local message", e)
+                Log.e("ChatViewModel", "sendMessage error", e)
+                _uiState.update { state ->
+                    state.copy(
+                        networkBannerMessage = "Network error: ${e.localizedMessage ?: "message not sent"}"
+                    )
+                }
             }
         }
     }
 
+    /**
+     * Send the picked media items. For items that have a real content:// URI we
+     * upload via multipart POST /messages. For drawable-only items (sample gallery
+     * in the attachment sheet) we cannot upload a packaged resource — we log and skip.
+     */
     fun sendMediaItems(items: List<MediaPickerItem>) {
         if (items.isEmpty()) return
+        val currentChatId = _uiState.value.selectedChatId ?: return
 
         val currentTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
-        val newMessages = items.map { item ->
+
+        // Optimistic local insert for instant feedback
+        val localMessages = items.map { item ->
             MessageItem(
                 id = UUID.randomUUID().toString(),
                 time = currentTime,
                 isOutgoing = true,
                 type = MessageType.PHOTO,
-                photoResId = item.drawableResId ?: R.drawable.img_retro_guy_collage,
-                isRead = true
+                photoResId = item.drawableResId,
+                mediaUrl = item.uriString,
+                isRead = false
+            )
+        }
+        _uiState.update { state ->
+            state.copy(
+                currentMessages = state.currentMessages + localMessages,
+                isAttachmentSheetOpen = false
             )
         }
 
-        _uiState.update { state ->
-            state.copy(
-                currentMessages = state.currentMessages + newMessages,
-                isAttachmentSheetOpen = false
-            )
+        // Try to upload each item that has a real uriString
+        viewModelScope.launch {
+            items.forEachIndexed { index, item ->
+                val uriStr = item.uriString
+                if (uriStr.isNullOrBlank()) {
+                    Log.w("ChatViewModel", "sendMediaItems: skipping item without uri (drawable-only)")
+                    return@forEachIndexed
+                }
+                try {
+                    val file = uriToFile(uriStr) ?: return@forEachIndexed
+                    val mime = guessMime(uriStr)
+                    val reqFile = file.asRequestBody(mime.toMediaTypeOrNull())
+                    val filePart = MultipartBody.Part.createFormData("file", file.name, reqFile)
+
+                    val convPart = currentChatId.toRequestBody("text/plain".toMediaTypeOrNull())
+                    val typePart = "image".toRequestBody("text/plain".toMediaTypeOrNull())
+
+                    val resp = ApiClient.service.sendMessageMedia(
+                        file = filePart,
+                        conversationId = convPart,
+                        receiverId = null,
+                        type = typePart,
+                        text = null,
+                        replyTo = null,
+                        isSilent = "false".toRequestBody("text/plain".toMediaTypeOrNull()),
+                        duration = null,
+                        audioMetadata = null,
+                        location = null
+                    )
+
+                    if (resp.isSuccessful && resp.body() != null) {
+                        val serverMsg = resp.body()!!
+                        val mapped = mapApiMessageToItem(serverMsg)
+                        val localId = localMessages.getOrNull(index)?.id
+                        if (localId != null) {
+                            _uiState.update { state ->
+                                state.copy(
+                                    currentMessages = state.currentMessages.map {
+                                        if (it.id == localId) mapped else it
+                                    }
+                                )
+                            }
+                        }
+                    } else {
+                        val err = parseErrorBody(resp.errorBody())
+                        Log.e("ChatViewModel", "sendMediaItems upload failed: ${resp.code()} $err")
+                    }
+                } catch (e: Exception) {
+                    Log.e("ChatViewModel", "sendMediaItems upload error", e)
+                }
+            }
         }
     }
 
@@ -530,12 +684,84 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             state.copy(currentMessages = updated)
         }
 
-        // Call API
+        // Real API call (POST /messages/:messageId/react — server toggles)
         viewModelScope.launch {
             try {
                 ApiClient.service.reactMessage(messageId, ReactionRequest(emoji = emoji))
             } catch (e: Exception) {
                 Log.e("ChatViewModel", "reactMessage error", e)
+            }
+        }
+    }
+
+    fun deleteMessage(messageId: String) {
+        _uiState.update { state ->
+            state.copy(currentMessages = state.currentMessages.filter { it.id != messageId })
+        }
+        viewModelScope.launch {
+            try {
+                ApiClient.service.deleteMessage(messageId)
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "deleteMessage error", e)
+            }
+        }
+    }
+
+    fun editMessage(messageId: String, newText: String) {
+        _uiState.update { state ->
+            val updated = state.currentMessages.map { msg ->
+                if (msg.id == messageId) msg.copy(text = newText) else msg
+            }
+            state.copy(currentMessages = updated)
+        }
+        viewModelScope.launch {
+            try {
+                ApiClient.service.editMessage(messageId, EditMessageRequest(text = newText))
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "editMessage error", e)
+            }
+        }
+    }
+
+    fun pinMessage(messageId: String) {
+        val currentChatId = _uiState.value.selectedChatId ?: return
+        viewModelScope.launch {
+            try {
+                ApiClient.service.pinMessage(currentChatId, PinMessageRequest(messageId = messageId, action = "pin"))
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "pinMessage error", e)
+            }
+        }
+    }
+
+    fun forwardMessage(targetConversationId: String, messageId: String) {
+        viewModelScope.launch {
+            try {
+                ApiClient.service.forwardMessage(
+                    ForwardMessageRequest(conversationId = targetConversationId, messageId = messageId)
+                )
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "forwardMessage error", e)
+            }
+        }
+    }
+
+    fun votePoll(messageId: String, optionId: String) {
+        viewModelScope.launch {
+            try {
+                ApiClient.service.votePoll(messageId, PollVoteRequest(optionId = optionId))
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "votePoll error", e)
+            }
+        }
+    }
+
+    fun closePoll(messageId: String) {
+        viewModelScope.launch {
+            try {
+                ApiClient.service.closePoll(messageId)
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "closePoll error", e)
             }
         }
     }
@@ -548,9 +774,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(isAttachmentSheetOpen = false) }
     }
 
-    // -------------------------------------------------------------
-    // Stickers & GIFs
-    // -------------------------------------------------------------
+    // =============================================================
+    // Stickers & GIFs — real API only (no mock fallback)
+    // =============================================================
 
     fun openStickerSheet() {
         _uiState.update { it.copy(isStickerSheetOpen = true) }
@@ -569,7 +795,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             val fetchedStickers = mutableListOf<StickerItem>()
             val fetchedGifs = mutableListOf<GifItem>()
 
-            // 1. Fetch Stickers from API
+            // 1. Stickers — GET /stickers
             try {
                 val res = ApiClient.service.getStickers()
                 if (res.isSuccessful && !res.body().isNullOrEmpty()) {
@@ -579,7 +805,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                                 StickerItem(
                                     id = s._id,
                                     name = s.name,
-                                    url = s.url,
+                                    url = ApiClient.resolveUrl(s.url) ?: s.url,
                                     pack = s.pack
                                 )
                             )
@@ -590,23 +816,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 Log.w("ChatViewModel", "Failed to fetch stickers: ${e.message}")
             }
 
-            // Fallback rich stickers if empty
-            if (fetchedStickers.isEmpty()) {
-                fetchedStickers.addAll(
-                    listOf<StickerItem>(
-                        StickerItem("s1", "Duck Thumbs Up", "https://cdn.jsdelivr.net/gh/telegramdesktop/tdesktop@master/Telegram/SourceFiles/art/emoji_sprites.png", "Telegram Duck"),
-                        StickerItem("s2", "Heart Duck", "https://api.dicebear.com/7.x/bottts/png?seed=duck1", "Telegram Duck"),
-                        StickerItem("s3", "Cool Cat", "https://api.dicebear.com/7.x/bottts/png?seed=cat2", "Cool Animals"),
-                        StickerItem("s4", "Happy Dog", "https://api.dicebear.com/7.x/bottts/png?seed=dog3", "Cool Animals"),
-                        StickerItem("s5", "Laughing Bunny", "https://api.dicebear.com/7.x/bottts/png?seed=bunny4", "Cool Animals"),
-                        StickerItem("s6", "Fire Robot", "https://api.dicebear.com/7.x/bottts/png?seed=bot5", "Tech Stickers"),
-                        StickerItem("s7", "Love Bot", "https://api.dicebear.com/7.x/bottts/png?seed=bot6", "Tech Stickers"),
-                        StickerItem("s8", "Star Bot", "https://api.dicebear.com/7.x/bottts/png?seed=bot7", "Tech Stickers")
-                    )
-                )
-            }
-
-            // 2. Fetch GIFs from API
+            // 2. GIFs — GET /gifs/global (trending) + GET /gifs (saved)
             try {
                 val res = ApiClient.service.getGlobalGifs()
                 if (res.isSuccessful && !res.body().isNullOrEmpty()) {
@@ -615,7 +825,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                             fetchedGifs.add(
                                 GifItem(
                                     id = g._id,
-                                    url = g.url,
+                                    url = ApiClient.resolveUrl(g.url) ?: g.url,
                                     sourceUrl = g.sourceUrl,
                                     width = g.width ?: 240,
                                     height = g.height ?: 240
@@ -625,21 +835,28 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
             } catch (e: Exception) {
-                Log.w("ChatViewModel", "Failed to fetch gifs: ${e.message}")
+                Log.w("ChatViewModel", "Failed to fetch global gifs: ${e.message}")
             }
 
-            // Fallback trending GIFs if empty
-            if (fetchedGifs.isEmpty()) {
-                fetchedGifs.addAll(
-                    listOf<GifItem>(
-                        GifItem("g1", "https://media.giphy.com/media/3o7TKSjRrfIPjeiVyM/giphy.gif"),
-                        GifItem("g2", "https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif"),
-                        GifItem("g3", "https://media.giphy.com/media/xT9IgzoKnwFNmISR8I/giphy.gif"),
-                        GifItem("g4", "https://media.giphy.com/media/26AHONQ79FdWZhAI0/giphy.gif"),
-                        GifItem("g5", "https://media.giphy.com/media/3oKIPnAiaMCws8nOsE/giphy.gif"),
-                        GifItem("g6", "https://media.giphy.com/media/l41lI4bYmcsPJX9Go/giphy.gif")
-                    )
-                )
+            try {
+                val res = ApiClient.service.getGifs()
+                if (res.isSuccessful && !res.body().isNullOrEmpty()) {
+                    res.body()!!.forEach { g ->
+                        if (g.url.isNotBlank() && fetchedGifs.none { it.id == g._id }) {
+                            fetchedGifs.add(
+                                GifItem(
+                                    id = g._id,
+                                    url = ApiClient.resolveUrl(g.url) ?: g.url,
+                                    sourceUrl = g.sourceUrl,
+                                    width = g.width ?: 240,
+                                    height = g.height ?: 240
+                                )
+                            )
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("ChatViewModel", "Failed to fetch saved gifs: ${e.message}")
             }
 
             _uiState.update {
@@ -809,175 +1026,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // -------------------------------------------------------------
-    // Media Viewers (Photo Zoom & Video Player)
-    // -------------------------------------------------------------
-
-    fun openPhotoViewer(message: MessageItem) {
-        _uiState.update { it.copy(activePhotoMessage = message) }
-    }
-
-    fun closePhotoViewer() {
-        _uiState.update { it.copy(activePhotoMessage = null) }
-    }
-
-    fun openVideoPlayer(message: MessageItem) {
-        _uiState.update { it.copy(activeVideoMessage = message) }
-    }
-
-    fun closeVideoPlayer() {
-        _uiState.update { it.copy(activeVideoMessage = null) }
-    }
-
-    // -------------------------------------------------------------
-    // Profile Modal Flow (PUT /auth/profile)
-    // -------------------------------------------------------------
-
-    fun openUserProfile(chatId: String? = null) {
-        val targetId = chatId ?: _uiState.value.selectedChatId
-        val chat = _uiState.value.chats.find { it.id == targetId }
-        val profile = UserProfileData(
-            id = chat?.id ?: "u1",
-            name = chat?.title ?: "User",
-            username = chat?.title?.lowercase()?.replace(" ", "_"),
-            phone = "+1 (555) 019-2834",
-            bio = "Available on Telegram",
-            avatarUrl = chat?.avatarUrl,
-            avatarType = chat?.avatarType ?: AvatarType.MOTORCYCLE,
-            isOnline = true,
-            isSelf = false
-        )
-        _uiState.update { it.copy(profileUser = profile, isProfileModalOpen = true) }
-    }
-
-    fun openCurrentUserProfile() {
-        val profile = UserProfileData(
-            id = sessionManager.userId ?: "self",
-            name = sessionManager.name ?: "My Profile",
-            username = sessionManager.username ?: "me",
-            phone = sessionManager.phone ?: "+98 912 000 0000",
-            bio = sessionManager.bio ?: "Hey there! I am using Telegram.",
-            avatarUrl = sessionManager.avatar,
-            avatarType = AvatarType.MOTORCYCLE,
-            isOnline = true,
-            isSelf = true
-        )
-        _uiState.update { it.copy(profileUser = profile, isProfileModalOpen = true) }
-    }
-
-    fun closeUserProfile() {
-        _uiState.update { it.copy(isProfileModalOpen = false, profileUser = null) }
-    }
-
-    fun updateProfile(name: String, username: String, bio: String) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isProfileUpdating = true) }
-            try {
-                val cleanUsername = username.removePrefix("@").trim()
-                val response = ApiClient.service.updateProfile(
-                    UpdateProfileRequest(
-                        name = name.trim(),
-                        username = cleanUsername.ifBlank { null },
-                        bio = bio.trim()
-                    )
-                )
-
-                if (response.isSuccessful && response.body() != null) {
-                    val user = response.body()!!
-                    sessionManager.updateProfile(user.name ?: name, user.username ?: cleanUsername, user.bio ?: bio)
-                    _uiState.update {
-                        it.copy(
-                            currentUserName = user.name ?: name,
-                            currentUserBio = user.bio ?: bio,
-                            profileUser = it.profileUser?.copy(
-                                name = user.name ?: name,
-                                username = user.username ?: cleanUsername,
-                                bio = user.bio ?: bio
-                            ),
-                            isProfileUpdating = false
-                        )
-                    }
-                } else {
-                    // Update locally if backend mock returns code without error
-                    sessionManager.updateProfile(name, cleanUsername, bio)
-                    _uiState.update {
-                        it.copy(
-                            currentUserName = name,
-                            currentUserBio = bio,
-                            profileUser = it.profileUser?.copy(
-                                name = name,
-                                username = cleanUsername,
-                                bio = bio
-                            ),
-                            isProfileUpdating = false
-                        )
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e("ChatViewModel", "Profile update failed", e)
-                sessionManager.updateProfile(name, username, bio)
-                _uiState.update {
-                    it.copy(
-                        currentUserName = name,
-                        currentUserBio = bio,
-                        profileUser = it.profileUser?.copy(name = name, username = username, bio = bio),
-                        isProfileUpdating = false
-                    )
-                }
-            }
-        }
-    }
-
-    fun deleteMessage(messageId: String) {
-        _uiState.update { state ->
-            state.copy(currentMessages = state.currentMessages.filter { it.id != messageId })
-        }
-        viewModelScope.launch {
-            try {
-                ApiClient.service.deleteMessage(messageId)
-            } catch (e: Exception) {
-                Log.e("ChatViewModel", "deleteMessage error", e)
-            }
-        }
-    }
-
-    fun editMessage(messageId: String, newText: String) {
-        _uiState.update { state ->
-            val updated = state.currentMessages.map { msg ->
-                if (msg.id == messageId) msg.copy(text = newText) else msg
-            }
-            state.copy(currentMessages = updated)
-        }
-        val currentChatId = _uiState.value.selectedChatId ?: return
-        viewModelScope.launch {
-            try {
-                ApiClient.service.editMessage(
-                    messageId,
-                    SendMessageRequest(
-                        conversationId = currentChatId,
-                        text = newText,
-                        type = "text"
-                    )
-                )
-            } catch (e: Exception) {
-                Log.e("ChatViewModel", "editMessage error", e)
-            }
-        }
-    }
-
-    fun pinMessage(messageId: String) {
-        _uiState.update { state ->
-            val msg = state.currentMessages.find { it.id == messageId }
-            state
-        }
-    }
-
     fun sendLocation(latitude: Double, longitude: Double, title: String) {
         val currentChatId = _uiState.value.selectedChatId ?: return
         val currentTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val localMessage = MessageItem(
             id = UUID.randomUUID().toString(),
-            text = "$title ($latitude, $longitude)",
+            text = title,
             time = currentTime,
             isOutgoing = true,
             type = MessageType.LOCATION,
@@ -996,8 +1050,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 ApiClient.service.sendMessage(
                     SendMessageRequest(
                         conversationId = currentChatId,
-                        text = "$title ($latitude, $longitude)",
-                        type = "location"
+                        text = title,
+                        type = "location",
+                        location = ApiLocation(lat = latitude, lng = longitude, name = title)
                     )
                 )
             } catch (e: Exception) {
@@ -1006,6 +1061,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * Send a poll per spec §8.7: POST /messages with type="poll" and a populated
+     * `poll` object containing question, options[], anonymous, multiSelect,
+     * allowChangeVote.
+     */
     fun sendPoll(question: String, options: List<String>, isAnonymous: Boolean) {
         val currentChatId = _uiState.value.selectedChatId ?: return
         val currentTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
@@ -1027,11 +1087,20 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             try {
+                val poll = ApiPoll(
+                    question = question,
+                    options = options.map { ApiPollOption(text = it, voters = emptyList()) },
+                    anonymous = isAnonymous,
+                    multiSelect = false,
+                    allowChangeVote = true,
+                    closedAt = null
+                )
                 ApiClient.service.sendMessage(
                     SendMessageRequest(
                         conversationId = currentChatId,
                         text = question,
-                        type = "poll"
+                        type = "poll",
+                        poll = poll
                     )
                 )
             } catch (e: Exception) {
@@ -1086,6 +1155,177 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
+    // =============================================================
+    // Media Viewers (Photo Zoom & Video Player)
+    // =============================================================
+
+    fun openPhotoViewer(message: MessageItem) {
+        _uiState.update { it.copy(activePhotoMessage = message) }
+    }
+
+    fun closePhotoViewer() {
+        _uiState.update { it.copy(activePhotoMessage = null) }
+    }
+
+    fun openVideoPlayer(message: MessageItem) {
+        _uiState.update { it.copy(activeVideoMessage = message) }
+    }
+
+    fun closeVideoPlayer() {
+        _uiState.update { it.copy(activeVideoMessage = null) }
+    }
+
+    // =============================================================
+    // Profile Modal Flow — fetch real profile via GET /auth/users/{id}
+    // =============================================================
+
+    fun openUserProfile(chatId: String? = null) {
+        val targetId = chatId ?: _uiState.value.selectedChatId
+        val chat = _uiState.value.chats.find { it.id == targetId }
+
+        // Show modal immediately with whatever we have locally, then enrich from API
+        val initial = UserProfileData(
+            id = chat?.id ?: "unknown",
+            name = chat?.title ?: "User",
+            username = chat?.title?.lowercase()?.replace(" ", "_"),
+            phone = null,
+            bio = null,
+            avatarUrl = chat?.avatarUrl,
+            avatarType = chat?.avatarType ?: AvatarType.MOTORCYCLE,
+            isOnline = false,
+            isSelf = false
+        )
+        _uiState.update { it.copy(profileUser = initial, isProfileModalOpen = true) }
+
+        // Look up the other participant's user id and fetch full profile from API
+        viewModelScope.launch {
+            try {
+                // First fetch the full conversation to populate participants
+                val convResp = ApiClient.service.getConversation(targetId ?: return@launch)
+                if (!convResp.isSuccessful || convResp.body() == null) return@launch
+                val conv = convResp.body()!!
+                val other = conv.participants?.firstOrNull { it.user?._id != sessionManager.userId }
+                val otherUserId = other?.user?._id ?: return@launch
+
+                val userResp = ApiClient.service.getUser(otherUserId)
+                if (userResp.isSuccessful && userResp.body() != null) {
+                    val u = userResp.body()!!
+                    _uiState.update {
+                        it.copy(
+                            profileUser = it.profileUser?.copy(
+                                id = u._id ?: it.profileUser?.id ?: "unknown",
+                                name = u.name ?: it.profileUser?.name ?: "User",
+                                username = u.username ?: it.profileUser?.username,
+                                phone = u.phone,
+                                bio = u.bio,
+                                avatarUrl = ApiClient.resolveUrl(u.avatar) ?: it.profileUser?.avatarUrl
+                            )
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("ChatViewModel", "openUserProfile fetch failed: ${e.message}")
+            }
+        }
+    }
+
+    fun openCurrentUserProfile() {
+        val profile = UserProfileData(
+            id = sessionManager.userId ?: "self",
+            name = sessionManager.name ?: "My Profile",
+            username = sessionManager.username,
+            phone = sessionManager.phone,
+            bio = sessionManager.bio ?: "Hey there! I am using 7eve9Chat.",
+            avatarUrl = ApiClient.resolveUrl(sessionManager.avatar),
+            avatarType = AvatarType.MOTORCYCLE,
+            isOnline = true,
+            isSelf = true
+        )
+        _uiState.update { it.copy(profileUser = profile, isProfileModalOpen = true) }
+
+        // Refresh from /auth/me in the background
+        viewModelScope.launch {
+            try {
+                val resp = ApiClient.service.getMe()
+                if (resp.isSuccessful && resp.body() != null) {
+                    val u = resp.body()!!
+                    _uiState.update {
+                        it.copy(
+                            profileUser = it.profileUser?.copy(
+                                name = u.name ?: it.profileUser?.name,
+                                username = u.username ?: it.profileUser?.username,
+                                phone = u.phone ?: it.profileUser?.phone,
+                                bio = u.bio ?: it.profileUser?.bio,
+                                avatarUrl = ApiClient.resolveUrl(u.avatar) ?: it.profileUser?.avatarUrl,
+                                birthday = u.birthday ?: it.profileUser?.birthday
+                            )
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("ChatViewModel", "openCurrentUserProfile refresh failed: ${e.message}")
+            }
+        }
+    }
+
+    fun closeUserProfile() {
+        _uiState.update { it.copy(isProfileModalOpen = false, profileUser = null) }
+    }
+
+    fun updateProfile(name: String, username: String, bio: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isProfileUpdating = true) }
+            try {
+                val cleanUsername = username.removePrefix("@").trim()
+                val response = ApiClient.service.updateProfile(
+                    UpdateProfileRequest(
+                        name = name.trim(),
+                        username = cleanUsername.ifBlank { null },
+                        bio = bio.trim()
+                    )
+                )
+
+                if (response.isSuccessful && response.body() != null) {
+                    val user = response.body()!!
+                    sessionManager.updateProfile(
+                        user.name ?: name,
+                        user.username ?: cleanUsername,
+                        user.bio ?: bio
+                    )
+                    _uiState.update {
+                        it.copy(
+                            currentUserName = user.name ?: name,
+                            currentUserBio = user.bio ?: bio,
+                            profileUser = it.profileUser?.copy(
+                                name = user.name ?: name,
+                                username = user.username ?: cleanUsername,
+                                bio = user.bio ?: bio,
+                                avatarUrl = ApiClient.resolveUrl(user.avatar) ?: it.profileUser?.avatarUrl
+                            ),
+                            isProfileUpdating = false
+                        )
+                    }
+                } else {
+                    val err = parseErrorBody(response.errorBody())
+                    _uiState.update {
+                        it.copy(
+                            isProfileUpdating = false,
+                            networkBannerMessage = "Profile update failed (${response.code()}): ${err ?: "error"}"
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "Profile update failed", e)
+                _uiState.update {
+                    it.copy(
+                        isProfileUpdating = false,
+                        networkBannerMessage = "Network error updating profile: ${e.localizedMessage ?: "check connection"}"
+                    )
+                }
+            }
+        }
+    }
+
     fun selectCategoryTab(tab: String) {
         _uiState.update { it.copy(selectedCategoryTab = tab) }
     }
@@ -1102,9 +1342,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(searchQuery = query) }
     }
 
-    // -------------------------------------------------------------
-    // Helper formatting and fallback data
-    // -------------------------------------------------------------
+    // =============================================================
+    // Helpers
+    // =============================================================
 
     private fun formatApiTime(isoString: String?): String {
         if (isoString.isNullOrBlank()) {
@@ -1126,168 +1366,54 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun loadFallbackChats() {
-        _uiState.update {
-            it.copy(
-                chats = fallbackChatsList(),
-                currentMessages = defaultMessagesList()
-            )
+    private fun parseErrorBody(body: okhttp3.ResponseBody?): String? {
+        if (body == null) return null
+        return try {
+            val raw = body.string()
+            // Try to extract {"message":"..."} or {"error":"..."} — fall back to raw text
+            val msgRegex = Regex("\"(?:message|error|msg)\"\\s*:\\s*\"([^\"]+)\"")
+            msgRegex.find(raw)?.groupValues?.getOrNull(1) ?: raw.take(200)
+        } catch (_: Exception) {
+            null
         }
     }
 
-    private fun fallbackChatsList(): List<ChatItem> = listOf(
-        ChatItem(
-            id = "c1",
-            title = "friends group",
-            subtitle = "Скачать видео из YouTube Pinterest: 🫶 ...",
-            time = "Aug 29",
-            isPinned = true,
-            avatarType = AvatarType.GALAXY
-        ),
-        ChatItem(
-            id = "c2",
-            title = "Только я сам 🚗",
-            subtitle = "https://t.me/proxy?server=k29s8d3f.mt.tr...",
-            time = "May 29",
-            isPinned = true,
-            hasDoubleCheck = true,
-            avatarType = AvatarType.CAR
-        ),
-        ChatItem(
-            id = "c3",
-            title = "Save Photos 🔇",
-            subtitle = "هوش مصنوعی | آنلاین: چون ایدی این ربات رو این‌ط...",
-            time = "Sep 05",
-            isPinned = true,
-            isMuted = true,
-            avatarType = AvatarType.DUCK
-        ),
-        ChatItem(
-            id = "c4",
-            title = "Close",
-            subtitle = "You: @nudesremoverbot",
-            time = "Jul 19",
-            isPinned = true,
-            hasSingleCheck = true,
-            avatarType = AvatarType.ANIME_GIRL
-        ),
-        ChatItem(
-            id = "c5",
-            title = "GAP SOULS | گپ سولز",
-            subtitle = "GUTS: گیم نت دو بار بیشتر نرفتم",
-            time = "00:50",
-            unreadCount = 17235,
-            hasMention = true,
-            avatarType = AvatarType.SAMURAI
-        ),
-        ChatItem(
-            id = "c6",
-            title = "I'm Sorry",
-            subtitle = "۱ نفرررر",
-            time = "00:50",
-            unreadCount = 34,
-            avatarType = AvatarType.HUG
-        ),
-        ChatItem(
-            id = "c7",
-            title = "گروه مای انیمه | MyAnimes",
-            subtitle = "M_yasin: نه نه نه جاست بستنی زعفرونی",
-            time = "00:50",
-            unreadCount = 270419,
-            avatarType = AvatarType.TEXT_LOGO
-        ),
-        ChatItem(
-            id = "c8",
-            title = "گپ گیمینگ | COD Nexus GP",
-            subtitle = "••• پژمان is typing",
-            time = "00:50",
-            unreadCount = 267945,
-            isTyping = true,
-            typingUser = "پژمان",
-            avatarType = AvatarType.SKULL
-        ),
-        ChatItem(
-            id = "c9",
-            title = "Chat corridor... (Nani Kore?!) 🔇",
-            subtitle = "GIF",
-            time = "00:50",
-            unreadCount = 109535,
-            isMuted = true,
-            avatarType = AvatarType.PIXEL_ART
-        ),
-        ChatItem(
-            id = "c10",
-            title = "سلحشور",
-            subtitle = "بنازوم",
-            time = "00:51",
-            hasSingleCheck = true,
-            avatarType = AvatarType.MOTORCYCLE
-        )
-    )
+    /**
+     * Resolve a content:// or file:// URI into a real File on disk that we can
+     * pass to MultipartBody.Part. Returns null if the URI scheme is unsupported
+     * or the file can't be opened.
+     */
+    private fun uriToFile(uriString: String): File? {
+        return try {
+            val uri = Uri.parse(uriString)
+            val ctx = getApplication<Application>()
+            val tmp = File.createTempFile("upload_", ".bin", ctx.cacheDir)
+            ctx.contentResolver.openInputStream(uri)?.use { input ->
+                tmp.outputStream().use { output -> input.copyTo(output) }
+            } ?: return null
+            tmp
+        } catch (e: Exception) {
+            Log.w("ChatViewModel", "uriToFile failed for $uriString: ${e.message}")
+            null
+        }
+    }
 
-    private fun defaultMessagesList(): List<MessageItem> = listOf(
-        MessageItem(
-            id = "m_sticker",
-            time = "21:08",
-            isOutgoing = false,
-            type = MessageType.BIG_STICKER,
-            reactions = listOf(ReactionItem("❤️", AvatarType.MOTORCYCLE))
-        ),
-        MessageItem(
-            id = "m_collage",
-            time = "23:58",
-            isOutgoing = false,
-            type = MessageType.IMAGE_COLLAGE,
-            photoResId = R.drawable.img_retro_guy_collage,
-            dateHeader = "September 11"
-        ),
-        MessageItem(
-            id = "m_incoming_text",
-            text = "هر کدومو خواستی وردار👍",
-            time = "23:58",
-            isOutgoing = false,
-            type = MessageType.TEXT,
-            reactions = listOf(ReactionItem("🤣", AvatarType.MOTORCYCLE))
-        ),
-        MessageItem(
-            id = "m_video",
-            text = "Check out this clip 🎥",
-            time = "00:15",
-            isOutgoing = false,
-            type = MessageType.VIDEO,
-            mediaUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-            videoThumbnailUrl = "https://images.unsplash.com/photo-1579202673506-ca3ce28943ef?w=600",
-            duration = 15,
-            reactions = listOf(ReactionItem("🔥", AvatarType.MOTORCYCLE))
-        ),
-        MessageItem(
-            id = "m_audio",
-            text = "Voice message",
-            time = "00:32",
-            isOutgoing = false,
-            type = MessageType.AUDIO,
-            mediaUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-            duration = 24,
-            fileName = "Voice note (0:24)"
-        ),
-        MessageItem(
-            id = "m_gif",
-            time = "00:45",
-            isOutgoing = true,
-            type = MessageType.GIF,
-            mediaUrl = "https://media.giphy.com/media/3o7TKSjRrfIPjeiVyM/giphy.gif",
-            isRead = true
-        ),
-        MessageItem(
-            id = "m_outgoing_text",
-            text = "بنازوم",
-            time = "00:51",
-            isOutgoing = true,
-            type = MessageType.TEXT,
-            isRead = true,
-            dateHeader = "September 12"
-        )
-    )
+    private fun guessMime(uriString: String): String {
+        val lower = uriString.lowercase(Locale.ROOT)
+        return when {
+            lower.endsWith(".jpg") || lower.endsWith(".jpeg") -> "image/jpeg"
+            lower.endsWith(".png") -> "image/png"
+            lower.endsWith(".webp") -> "image/webp"
+            lower.endsWith(".gif") -> "image/gif"
+            lower.endsWith(".mp4") -> "video/mp4"
+            lower.endsWith(".webm") -> "video/webm"
+            lower.endsWith(".mp3") -> "audio/mpeg"
+            lower.endsWith(".m4a") -> "audio/mp4"
+            lower.endsWith(".ogg") -> "audio/ogg"
+            lower.endsWith(".pdf") -> "application/pdf"
+            else -> "application/octet-stream"
+        }
+    }
 
     override fun onCleared() {
         super.onCleared()
