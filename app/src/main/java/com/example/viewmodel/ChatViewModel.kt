@@ -32,6 +32,7 @@ import com.example.data.model.GifItem
 import com.example.data.model.MediaPickerItem
 import com.example.data.model.MessageItem
 import com.example.data.model.MessageType
+import com.example.data.model.MessageStatus
 import com.example.data.model.ReactionItem
 import com.example.data.model.StickerItem
 import com.example.ui.components.UserProfileData
@@ -1005,16 +1006,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
         val currentTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val tempId = UUID.randomUUID().toString()
+        // Start with SENDING status — shows clock icon
         val localMessage = MessageItem(
             id = tempId,
             text = text.trim(),
             time = currentTime,
             isOutgoing = true,
             type = MessageType.TEXT,
-            isRead = false
+            isRead = false,
+            status = MessageStatus.SENDING
         )
 
-        // Optimistic UI update
+        // Optimistic UI update — message appears immediately with clock icon
         _uiState.update { state ->
             val updatedMessages = state.currentMessages + localMessage
             val updatedChats = state.chats.map { chat ->
@@ -1039,7 +1042,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 val response = ApiClient.service.sendMessage(req)
                 if (response.isSuccessful && response.body() != null) {
                     val serverMsg = response.body()!!
-                    val mapped = mapApiMessageToItem(serverMsg)
+                    val mapped = mapApiMessageToItem(serverMsg).copy(
+                        status = MessageStatus.SENT  // Single check — server accepted
+                    )
 
                     _uiState.update { state ->
                         val updated = state.currentMessages.map {
@@ -1048,21 +1053,78 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         state.copy(currentMessages = updated)
                     }
                 } else {
-                    // Mark local message as failed (still show it, but update state)
                     val err = parseErrorBody(response.errorBody())
                     Log.e("ChatViewModel", "sendMessage failed: ${response.code()} $err")
+                    // Mark as FAILED — shows error icon, user can retry
                     _uiState.update { state ->
+                        val updated = state.currentMessages.map {
+                            if (it.id == tempId) it.copy(status = MessageStatus.FAILED) else it
+                        }
                         state.copy(
-                            networkBannerMessage = "Failed to send message (${response.code()})"
+                            currentMessages = updated,
+                            networkBannerMessage = "Failed to send: ${err ?: "code ${response.code()}"}"
                         )
                     }
                 }
             } catch (e: Exception) {
                 Log.e("ChatViewModel", "sendMessage error", e)
+                // Mark as FAILED
                 _uiState.update { state ->
+                    val updated = state.currentMessages.map {
+                        if (it.id == tempId) it.copy(status = MessageStatus.FAILED) else it
+                    }
                     state.copy(
+                        currentMessages = updated,
                         networkBannerMessage = "Network error: ${e.localizedMessage ?: "message not sent"}"
                     )
+                }
+            }
+        }
+    }
+
+    /** Retry sending a failed message. */
+    fun retrySendMessage(messageId: String) {
+        val msg = _uiState.value.currentMessages.find { it.id == messageId } ?: return
+        if (msg.status != MessageStatus.FAILED) return
+        val currentChatId = _uiState.value.selectedChatId ?: return
+
+        // Set back to SENDING
+        _uiState.update { state ->
+            state.copy(currentMessages = state.currentMessages.map {
+                if (it.id == messageId) it.copy(status = MessageStatus.SENDING) else it
+            })
+        }
+
+        viewModelScope.launch {
+            try {
+                val req = SendMessageRequest(
+                    conversationId = currentChatId,
+                    text = msg.text,
+                    type = "text"
+                )
+                val response = ApiClient.service.sendMessage(req)
+                if (response.isSuccessful && response.body() != null) {
+                    val mapped = mapApiMessageToItem(response.body()!!).copy(
+                        status = MessageStatus.SENT
+                    )
+                    _uiState.update { state ->
+                        state.copy(currentMessages = state.currentMessages.map {
+                            if (it.id == messageId) mapped else it
+                        })
+                    }
+                } else {
+                    _uiState.update { state ->
+                        state.copy(currentMessages = state.currentMessages.map {
+                            if (it.id == messageId) it.copy(status = MessageStatus.FAILED) else it
+                        })
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "retrySendMessage error", e)
+                _uiState.update { state ->
+                    state.copy(currentMessages = state.currentMessages.map {
+                        if (it.id == messageId) it.copy(status = MessageStatus.FAILED) else it
+                    })
                 }
             }
         }

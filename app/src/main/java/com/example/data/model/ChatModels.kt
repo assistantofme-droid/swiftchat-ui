@@ -26,6 +26,15 @@ enum class MessageType {
     FILE
 }
 
+/** Message delivery status — controls the icon shown next to the time. */
+enum class MessageStatus {
+    SENDING,    // Clock icon — message is being sent to server
+    SENT,       // Single check — server accepted it
+    DELIVERED,  // Double check (grey) — delivered to recipient's device
+    READ,       // Double check (blue) — recipient read it
+    FAILED      // Error icon — send failed, can retry
+}
+
 data class ReactionItem(
     val emoji: String,
     val userAvatarType: AvatarType = AvatarType.MOTORCYCLE,
@@ -41,13 +50,14 @@ data class MessageItem(
     val photoResId: Int? = null,
     val mediaUrl: String? = null,
     val videoThumbnailUrl: String? = null,
-    val duration: Int? = null, // Duration in seconds for audio/video
+    val duration: Int? = null,
     val fileName: String? = null,
     val senderName: String? = null,
     val senderAvatarUrl: String? = null,
     val reactions: List<ReactionItem> = emptyList(),
     val isRead: Boolean = true,
-    val dateHeader: String? = null
+    val dateHeader: String? = null,
+    val status: MessageStatus = MessageStatus.SENT
 )
 
 data class StickerItem(

@@ -20,10 +20,12 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DoneAll
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Pause
@@ -53,6 +55,7 @@ import coil.compose.AsyncImage
 import com.example.R
 import com.example.data.api.ApiClient
 import com.example.data.model.MessageItem
+import com.example.data.model.MessageStatus
 import com.example.data.model.MessageType
 import com.example.ui.media.AudioPlayerManager
 import com.example.ui.theme.TelegramBubbleDatePill
@@ -319,9 +322,9 @@ private fun StandardTextBubble(
 
                     if (message.isOutgoing) {
                         Icon(
-                            imageVector = if (message.isRead) Icons.Default.DoneAll else Icons.Default.Check,
+                            imageVector = messageStatusIcon(message),
                             contentDescription = if (message.isRead) "Read" else "Sent",
-                            tint = if (message.isRead) TelegramCheckBlue else Color.White.copy(alpha = 0.75f),
+                            tint = messageStatusTint(message),
                             modifier = Modifier.size(15.dp)
                         )
                     }
@@ -410,9 +413,9 @@ private fun PhotoBubble(
                     )
                     if (message.isOutgoing) {
                         Icon(
-                            imageVector = if (message.isRead) Icons.Default.DoneAll else Icons.Default.Check,
+                            imageVector = messageStatusIcon(message),
                             contentDescription = "Status",
-                            tint = if (message.isRead) TelegramCheckBlue else Color.White,
+                            tint = messageStatusTint(message),
                             modifier = Modifier.size(13.dp)
                         )
                     }
@@ -535,9 +538,9 @@ private fun VideoBubble(
                 )
                 if (message.isOutgoing) {
                     Icon(
-                        imageVector = if (message.isRead) Icons.Default.DoneAll else Icons.Default.Check,
+                        imageVector = messageStatusIcon(message),
                         contentDescription = "Status",
-                        tint = if (message.isRead) TelegramCheckBlue else Color.White,
+                        tint = messageStatusTint(message),
                         modifier = Modifier.size(13.dp)
                     )
                 }
@@ -652,9 +655,9 @@ private fun AudioMessageBubble(
                             )
                             if (message.isOutgoing) {
                                 Icon(
-                                    imageVector = if (message.isRead) Icons.Default.DoneAll else Icons.Default.Check,
+                                    imageVector = messageStatusIcon(message),
                                     contentDescription = "Status",
-                                    tint = if (message.isRead) TelegramCheckBlue else Color.White.copy(alpha = 0.75f),
+                                    tint = messageStatusTint(message),
                                     modifier = Modifier.size(14.dp)
                                 )
                             }
@@ -943,7 +946,7 @@ private fun LocationBubble(
                     if (message.isOutgoing) {
                         Spacer(modifier = Modifier.width(3.dp))
                         Icon(
-                            imageVector = if (message.isRead) Icons.Default.DoneAll else Icons.Default.Check,
+                            imageVector = messageStatusIcon(message),
                             contentDescription = null,
                             tint = TelegramCheckBlue,
                             modifier = Modifier.size(13.dp)
@@ -1154,7 +1157,7 @@ private fun FileBubble(
                     if (message.isOutgoing) {
                         Spacer(modifier = Modifier.width(3.dp))
                         Icon(
-                            imageVector = if (message.isRead) Icons.Default.DoneAll else Icons.Default.Check,
+                            imageVector = messageStatusIcon(message),
                             contentDescription = null,
                             tint = TelegramCheckBlue,
                             modifier = Modifier.size(13.dp)
@@ -1163,5 +1166,28 @@ private fun FileBubble(
                 }
             }
         }
+    }
+}
+
+/** Returns the appropriate icon for the message's delivery status. */
+private fun messageStatusIcon(message: MessageItem): androidx.compose.ui.graphics.vector.ImageVector {
+    return when (message.status) {
+        MessageStatus.SENDING -> Icons.Default.Schedule      // Clock
+        MessageStatus.SENT -> Icons.Default.Check            // Single check
+        MessageStatus.DELIVERED -> Icons.Default.DoneAll     // Double check (grey)
+        MessageStatus.READ -> Icons.Default.DoneAll          // Double check (blue)
+        MessageStatus.FAILED -> Icons.Default.ErrorOutline   // Error
+    }
+}
+
+/** Returns the appropriate tint color for the message's delivery status. */
+@Composable
+private fun messageStatusTint(message: MessageItem): Color {
+    return when (message.status) {
+        MessageStatus.SENDING -> Color.White.copy(alpha = 0.6f)
+        MessageStatus.SENT -> Color.White.copy(alpha = 0.75f)
+        MessageStatus.DELIVERED -> Color.White.copy(alpha = 0.75f)
+        MessageStatus.READ -> TelegramCheckBlue
+        MessageStatus.FAILED -> Color(0xFFFF5252)
     }
 }

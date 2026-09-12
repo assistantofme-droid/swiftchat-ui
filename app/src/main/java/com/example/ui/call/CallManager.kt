@@ -122,6 +122,74 @@ object CallManager {
         }
     }
 
+    /**
+     * Start a group voice call in a conversation. Uses POST /conversations/{id}/voice-call/start.
+     * The server marks the conversation as having an active voice call; other
+     * participants can then join via their own joinGroupCall call.
+     */
+    fun startGroupVoiceCall(
+        context: Context,
+        conversationId: String,
+        contactName: String,
+        contactAvatarUrl: String? = null
+    ) {
+        val tempCallId = UUID.randomUUID().toString()
+        _callState.value = CallState(
+            callId = tempCallId,
+            contactName = contactName,
+            contactAvatarUrl = contactAvatarUrl,
+            isVideo = false,
+            isMuted = false,
+            isSpeakerOn = true,
+            isCameraOff = false,
+            isFrontCamera = true,
+            isConnected = true,
+            durationSeconds = 0,
+            isFloating = false,
+            isInPip = false,
+            isActive = true
+        )
+        startCallTimer()
+
+        scope.launch {
+            try {
+                ApiClient.service.startGroupCall(conversationId)
+                Log.d("CallManager", "Group voice call started for $conversationId")
+            } catch (e: Exception) {
+                Log.e("CallManager", "startGroupVoiceCall error", e)
+            }
+        }
+    }
+
+    /**
+     * Leave a group voice call. Uses POST /conversations/{id}/voice-call/leave.
+     */
+    fun leaveGroupVoiceCall(conversationId: String) {
+        stopCallTimer()
+        _callState.value = CallState(isActive = false)
+        scope.launch {
+            try {
+                ApiClient.service.leaveGroupCall(conversationId)
+            } catch (e: Exception) {
+                Log.e("CallManager", "leaveGroupVoiceCall error", e)
+            }
+        }
+    }
+
+    /**
+     * Toggle mute in a group voice call.
+     */
+    fun toggleGroupCallMute(conversationId: String) {
+        _callState.value = _callState.value.copy(isMuted = !_callState.value.isMuted)
+        scope.launch {
+            try {
+                ApiClient.service.toggleGroupCallMute(conversationId)
+            } catch (e: Exception) {
+                Log.e("CallManager", "toggleGroupCallMute error", e)
+            }
+        }
+    }
+
     private fun startCallTimer() {
         stopCallTimer()
         timerRunnable = object : Runnable {
