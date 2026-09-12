@@ -27,12 +27,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.DoneAll
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PushPin
@@ -108,7 +106,6 @@ fun ChatListScreen(
     onCategoryTabSelect: (String) -> Unit,
     onBottomNavSelect: (Int) -> Unit,
     onChatClick: (ChatItem) -> Unit,
-    onNewChatClick: () -> Unit,
     onToggleTheme: () -> Unit = {},
     onOpenSavedMessages: () -> Unit = {},
     onNewGroup: () -> Unit = {},
@@ -430,26 +427,6 @@ fun ChatListScreen(
             }
         }
 
-        // Floating Action Button with Fluid Telegram Gradient & Glass Border
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(bottom = 90.dp, end = 16.dp)
-                .size(56.dp)
-                .shadow(10.dp, CircleShape, spotColor = Color(0x732481CC))
-                .clip(CircleShape)
-                .background(com.example.ui.theme.TelegramSendFabGradient)
-                .border(1.2.dp, Color(0x4DFFFFFF), CircleShape)
-                .clickable(onClick = onNewChatClick),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.Edit,
-                contentDescription = "New Chat",
-                tint = Color.White,
-                modifier = Modifier.size(24.dp)
-            )
-        }
     }
 }
 

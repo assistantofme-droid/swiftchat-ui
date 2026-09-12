@@ -1,6 +1,10 @@
 package com.example.ui.components
 
+import android.Manifest
+import android.content.ContentUris
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -11,7 +15,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -45,16 +48,15 @@ import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Poll
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -63,17 +65,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
-import com.example.R
 import com.example.data.model.AttachmentTab
 import com.example.data.model.MediaPickerItem
 import com.example.ui.theme.TelegramAccent
@@ -82,6 +82,23 @@ import com.example.ui.theme.TelegramSheetBg
 import com.example.ui.theme.TelegramTextPrimary
 import com.example.ui.theme.TelegramTextSecondary
 
+/**
+ * The attachment bottom sheet that opens when the user taps the paperclip in
+ * a chat. Shows:
+ *
+ *   - A "Recent Photos" grid of REAL device gallery thumbnails pulled from
+ *     MediaStore.Images.Media (not drawable defaults). Tapping thumbnails
+ *     selects them; the send FAB sends them as multipart POST /messages.
+ *   - A "Device Gallery" pill at the top that opens the system photo picker
+ *     (PickMultipleVisualMedia) for picking up to 10 photos/videos.
+ *   - A bottom tab bar with: Gallery / File / Music / Location / Poll
+ *     (Contact tab intentionally removed per spec — it was unused).
+ *
+ * The sheet requires the READ_MEDIA_IMAGES permission (or READ_EXTERNAL_STORAGE
+ * on API ≤ 32) to populate the recent-photos grid. If the permission isn't
+ * granted, the grid is empty and the user can still tap "Device Gallery" to
+ * pick media via the system picker (which doesn't need any permission).
+ */
 @Composable
 fun AttachmentBottomSheet(
     visible: Boolean,
@@ -93,10 +110,56 @@ fun AttachmentBottomSheet(
     onSendMusic: ((title: String, audioUri: String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     var isLocationDialogOpen by remember { mutableStateOf(false) }
     var isPollDialogOpen by remember { mutableStateOf(false) }
 
-    // Pick Multiple Photos / Videos from device gallery
+    // ===== Device gallery thumbnails (read from MediaStore on first show) =====
+    val deviceMediaItems = remember { mutableStateListOf<MediaPickerItem>() }
+    val selectedIds = remember { mutableStateListOf<String>() }
+    var hasMediaPermission by remember { mutableStateOf(false) }
+    var permissionChecked by remember { mutableStateOf(false) }
+
+    // Check if we already have permission to read images
+    val readImagesPerm = if (android.os.Build.VERSION.SDK_INT >= 33) {
+        Manifest.permission.READ_MEDIA_IMAGES
+    } else {
+        Manifest.permission.READ_EXTERNAL_STORAGE
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        hasMediaPermission = granted
+        permissionChecked = true
+        if (granted) {
+            loadDeviceGalleryThumbnails(context) { items ->
+                deviceMediaItems.clear()
+                deviceMediaItems.addAll(items)
+            }
+        }
+    }
+
+    // On first visibility, check permission and load thumbnails
+    LaunchedEffect(visible) {
+        if (visible && !permissionChecked) {
+            val granted = ContextCompat.checkSelfPermission(context, readImagesPerm) ==
+                PackageManager.PERMISSION_GRANTED
+            hasMediaPermission = granted
+            permissionChecked = true
+            if (granted) {
+                loadDeviceGalleryThumbnails(context) { items ->
+                    deviceMediaItems.clear()
+                    deviceMediaItems.addAll(items)
+                }
+            } else {
+                permissionLauncher.launch(readImagesPerm)
+            }
+        }
+    }
+
+    // ===== System pickers (no permission required) =====
+    // Pick multiple photos / videos from device gallery
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(10)
     ) { uris: List<Uri> ->
@@ -113,7 +176,7 @@ fun AttachmentBottomSheet(
         }
     }
 
-    // Pick Audio/Music from device
+    // Pick audio / music from device
     val audioPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -124,38 +187,21 @@ fun AttachmentBottomSheet(
         }
     }
 
-    // Pick File/Document from device
+    // Pick file / document from device
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         if (uri != null) {
-            val name = uri.lastPathSegment?.substringAfterLast("/") ?: "Document.pdf"
+            val name = uri.lastPathSegment?.substringAfterLast("/") ?: "Document"
             onSendFile?.invoke(name, uri.toString())
             onDismiss()
         }
     }
 
-    // Local media items
-    var mediaItems by remember {
-        mutableStateOf(
-            listOf(
-                MediaPickerItem(id = "cam", isCamera = true),
-                MediaPickerItem(id = "m1", drawableResId = R.drawable.img_retro_guy_collage),
-                MediaPickerItem(id = "m2", drawableResId = R.drawable.img_avatar_motorcycle),
-                MediaPickerItem(id = "m3", drawableResId = R.drawable.img_chat_wallpaper),
-                MediaPickerItem(id = "m4", drawableResId = R.drawable.img_app_icon),
-                MediaPickerItem(id = "m5", drawableResId = R.drawable.img_retro_guy_collage),
-                MediaPickerItem(id = "m6", drawableResId = R.drawable.img_avatar_motorcycle),
-                MediaPickerItem(id = "m7", drawableResId = R.drawable.img_chat_wallpaper),
-                MediaPickerItem(id = "m8", drawableResId = R.drawable.img_app_icon)
-            )
-        )
-    }
-
     var activeTab by remember { mutableStateOf(AttachmentTab.GALLERY) }
-    val selectedCount = mediaItems.count { it.isSelected }
+    val selectedCount = selectedIds.size
 
-    // Dialogs
+    // ===== Dialogs =====
     if (isLocationDialogOpen) {
         SendLocationDialog(
             visible = isLocationDialogOpen,
@@ -227,7 +273,7 @@ fun AttachmentBottomSheet(
                     )
                 }
 
-                // Device Photo Picker shortcut bar
+                // Header: "Recent Photos" + "Device Gallery" pill
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -269,7 +315,7 @@ fun AttachmentBottomSheet(
                     }
                 }
 
-                // Main Media Grid (3 Columns)
+                // ===== Media Grid — REAL device gallery thumbnails =====
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -282,97 +328,115 @@ fun AttachmentBottomSheet(
                         verticalArrangement = Arrangement.spacedBy(2.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        items(mediaItems, key = { it.id }) { item ->
-                            if (item.isCamera) {
-                                // Camera tile
+                        // Camera tile (always first)
+                        item(key = "camera_tile") {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(1f)
+                                    .background(Color(0xFF131D27))
+                                    .clickable {
+                                        photoPickerLauncher.launch(
+                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
+                                        )
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(
+                                        imageVector = Icons.Default.PhotoCamera,
+                                        contentDescription = "Camera",
+                                        tint = Color.White.copy(alpha = 0.85f),
+                                        modifier = Modifier.size(32.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "Camera",
+                                        color = Color.White.copy(alpha = 0.7f),
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+                        }
+
+                        // Real device photos
+                        items(deviceMediaItems, key = { it.id }) { item ->
+                            val isSelected = selectedIds.contains(item.id)
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(1f)
+                                    .background(Color(0xFF1B242D))
+                                    .clickable {
+                                        if (isSelected) {
+                                            selectedIds.remove(item.id)
+                                        } else {
+                                            selectedIds.add(item.id)
+                                        }
+                                    }
+                            ) {
+                                AsyncImage(
+                                    model = item.uriString,
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                                // Selection radio circle in top right corner
                                 Box(
                                     modifier = Modifier
-                                        .fillMaxWidth()
-                                        .aspectRatio(1f)
-                                        .background(Color(0xFF131D27))
-                                        .clickable {
-                                            photoPickerLauncher.launch(
-                                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
-                                            )
-                                        },
+                                        .align(Alignment.TopEnd)
+                                        .padding(6.dp)
+                                        .size(24.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (isSelected) TelegramPrimary else Color.Black.copy(alpha = 0.3f)
+                                        )
+                                        .border(
+                                            width = 2.dp,
+                                            color = if (isSelected) TelegramPrimary else Color.White.copy(alpha = 0.85f),
+                                            shape = CircleShape
+                                        ),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    if (isSelected) {
                                         Icon(
-                                            imageVector = Icons.Default.PhotoCamera,
-                                            contentDescription = "Camera",
-                                            tint = Color.White.copy(alpha = 0.85f),
-                                            modifier = Modifier.size(32.dp)
-                                        )
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = "Camera",
-                                            color = Color.White.copy(alpha = 0.7f),
-                                            fontSize = 11.sp
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = "Selected",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(16.dp)
                                         )
                                     }
                                 }
-                            } else {
-                                // Media thumbnail tile
+                            }
+                        }
+
+                        // If no permission granted yet, show a hint tile
+                        if (!hasMediaPermission && deviceMediaItems.isEmpty()) {
+                            item(key = "permission_hint") {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .aspectRatio(1f)
                                         .background(Color(0xFF1B242D))
                                         .clickable {
-                                            mediaItems = mediaItems.map {
-                                                if (it.id == item.id) it.copy(isSelected = !it.isSelected)
-                                                else it
-                                            }
-                                        }
+                                            permissionLauncher.launch(readImagesPerm)
+                                        },
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    if (item.drawableResId != null) {
-                                        Image(
-                                            painter = painterResource(id = item.drawableResId),
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Icon(
+                                            imageVector = Icons.Default.PhotoLibrary,
                                             contentDescription = null,
-                                            modifier = Modifier.fillMaxSize(),
-                                            contentScale = ContentScale.Crop
+                                            tint = TelegramTextSecondary,
+                                            modifier = Modifier.size(28.dp)
                                         )
-                                    } else if (item.uriString != null) {
-                                        AsyncImage(
-                                            model = item.uriString,
-                                            contentDescription = null,
-                                            modifier = Modifier.fillMaxSize(),
-                                            contentScale = ContentScale.Crop
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(
+                                            text = "Tap to allow\n gallery access",
+                                            color = TelegramTextSecondary,
+                                            fontSize = 10.sp,
+                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
                                         )
-                                    } else {
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .background(Color(0xFF2C3E50))
-                                        )
-                                    }
-
-                                    // Selection radio circle in top right corner
-                                    Box(
-                                        modifier = Modifier
-                                            .align(Alignment.TopEnd)
-                                            .padding(6.dp)
-                                            .size(24.dp)
-                                            .clip(CircleShape)
-                                            .background(
-                                                if (item.isSelected) TelegramPrimary else Color.Transparent
-                                            )
-                                            .border(
-                                                width = 2.dp,
-                                                color = if (item.isSelected) TelegramPrimary else Color.White.copy(alpha = 0.85f),
-                                                shape = CircleShape
-                                            ),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        if (item.isSelected) {
-                                            Icon(
-                                                imageVector = Icons.Default.Check,
-                                                contentDescription = "Selected",
-                                                tint = Color.White,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                        }
                                     }
                                 }
                             }
@@ -383,9 +447,9 @@ fun AttachmentBottomSheet(
                     if (selectedCount > 0) {
                         FloatingActionButton(
                             onClick = {
-                                val selected = mediaItems.filter { it.isSelected }
+                                val selected = deviceMediaItems.filter { selectedIds.contains(it.id) }
                                 onSendMedia(selected)
-                                mediaItems = mediaItems.map { it.copy(isSelected = false) }
+                                selectedIds.clear()
                                 onDismiss()
                             },
                             modifier = Modifier
@@ -404,7 +468,7 @@ fun AttachmentBottomSheet(
                     }
                 }
 
-                // Bottom Tab Bar inside Sheet: Gallery, File, Music, Location, Poll, Contact
+                // ===== Bottom tab bar: Gallery / File / Music / Location / Poll =====
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -461,19 +525,69 @@ fun AttachmentBottomSheet(
                             isPollDialogOpen = true
                         }
                     )
-                    AttachmentTabItem(
-                        label = "Contact",
-                        icon = Icons.Default.Person,
-                        isSelected = activeTab == AttachmentTab.CONTACT,
-                        onClick = {
-                            activeTab = AttachmentTab.CONTACT
-                            onDismiss()
-                        }
-                    )
                 }
             }
         }
     }
+}
+
+/**
+ * Query MediaStore.Images.Media for the most recent images on the device,
+ * returning a list of MediaPickerItem with their content:// uris. Runs on
+ * a background thread (caller's responsibility). Caps at 30 items so we
+ * don't blow up memory.
+ */
+private fun loadDeviceGalleryThumbnails(
+    context: android.content.Context,
+    onLoaded: (List<MediaPickerItem>) -> Unit
+) {
+    Thread {
+        try {
+            val items = mutableListOf<MediaPickerItem>()
+            val projection = arrayOf(
+                MediaStore.Images.Media._ID,
+                MediaStore.Images.Media.DISPLAY_NAME,
+                MediaStore.Images.Media.DATE_ADDED
+            )
+            val sortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
+            val collection = if (android.os.Build.VERSION.SDK_INT >= 29) {
+                MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+            } else {
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+            }
+            context.contentResolver.query(
+                collection,
+                projection,
+                null,
+                null,
+                sortOrder
+            )?.use { cursor ->
+                val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+                val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
+                var count = 0
+                while (cursor.moveToNext() && count < 30) {
+                    val id = cursor.getLong(idColumn)
+                    val name = cursor.getString(nameColumn)
+                    val uri = ContentUris.withAppendedId(collection, id)
+                    items.add(
+                        MediaPickerItem(
+                            id = "device_$id",
+                            uriString = uri.toString(),
+                            isSelected = false
+                        )
+                    )
+                    count++
+                }
+            }
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                onLoaded(items)
+            }
+        } catch (e: Exception) {
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                onLoaded(emptyList())
+            }
+        }
+    }.start()
 }
 
 @Composable

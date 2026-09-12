@@ -77,6 +77,20 @@ interface ApiService {
     @GET("auth/sessions")
     suspend fun getSessions(): Response<List<ApiSession>>
 
+    /** POST /auth/logout-all — invalidates ALL sessions on the account (spec §1.9). */
+    @POST("auth/logout-all")
+    suspend fun logoutAllDevices(): Response<ResponseBody>
+
+    /**
+     * POST /messages/contacts — start a private chat with a user and save them
+     * as a contact in one shot (spec §3 §messages/contacts).
+     * Body: { identifier: "phone or @username" }
+     */
+    @POST("messages/contacts")
+    suspend fun startPrivateChatWithContact(
+        @Body body: AddContactRequest
+    ): Response<ApiConversation>
+
     @POST("auth/block")
     suspend fun blockUser(
         @Body body: Map<String, String>
@@ -110,6 +124,13 @@ interface ApiService {
 
     @GET("conversations")
     suspend fun getConversations(): Response<List<ApiConversation>>
+
+    /**
+     * GET /conversations/saved — fetch the user's Saved Messages conversation
+     * (a private self-chat). Per spec §2.
+     */
+    @GET("conversations/saved")
+    suspend fun getSavedMessagesConversation(): Response<ApiConversation>
 
     @GET("conversations/{id}")
     suspend fun getConversation(
@@ -235,6 +256,44 @@ interface ApiService {
     suspend fun forwardMessage(
         @Body request: ForwardMessageRequest
     ): Response<ApiMessage>
+
+    /**
+     * GET /messages/{conversationId}/media — fetch the media-only feed
+     * (images/videos/files) shared in a conversation. Per spec §3.
+     */
+    @GET("messages/{conversationId}/media")
+    suspend fun getSharedMedia(
+        @Path("conversationId") conversationId: String,
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 50
+    ): Response<List<ApiMessage>>
+
+    /**
+     * POST /messages/{messageId}/view_once — register that a view-once
+     * photo was opened. Per spec §3.
+     */
+    @POST("messages/{messageId}/view_once")
+    suspend fun markViewOnceViewed(
+        @Path("messageId") messageId: String
+    ): Response<ResponseBody>
+
+    /**
+     * POST /messages/stop-generation/{messageId} — abort an AI bot's
+     * streaming reply. Per spec §3.
+     */
+    @POST("messages/stop-generation/{messageId}")
+    suspend fun stopGeneration(
+        @Path("messageId") messageId: String
+    ): Response<ResponseBody>
+
+    /**
+     * POST /messages/callback_query — simulate a tap on an inline bot
+     * button (callback_data). Per spec §3.
+     */
+    @POST("messages/callback_query")
+    suspend fun sendCallbackQuery(
+        @Body body: Map<String, String>
+    ): Response<ResponseBody>
 
     @POST("messages/{messageId}/poll/vote")
     suspend fun votePoll(

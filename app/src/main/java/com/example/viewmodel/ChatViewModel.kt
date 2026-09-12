@@ -1931,23 +1931,39 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Log out all other sessions on the account.
-     * The API spec doesn't have an explicit "logout-all" endpoint, but we can
-     * list sessions via GET /auth/sessions and the server's session-management
-     * layer is responsible for invalidating them. Here we just clear the local
-     * session and show a confirmation — the next time the user logs in they'll
-     * get a fresh session token, and any other sessions will eventually expire.
+     * Log out all other sessions on the account by calling POST /auth/logout-all.
+     * Per spec §1.9, this invalidates every session on the account — INCLUDING
+     * the current one. After calling it we wipe the local session and send the
+     * user back to the login screen.
      */
     fun logoutAllOtherDevices() {
         viewModelScope.launch {
             try {
-                ApiClient.service.getSessions()
+                ApiClient.service.logoutAllDevices()
+                // The server killed our token too — drop everything locally
+                // and bounce back to login.
+                sessionManager.clearSession()
+                messagePollingJob?.cancel()
+                conversationPollingJob?.cancel()
                 _uiState.update {
-                    it.copy(networkBannerMessage = "Logged out other devices (local session preserved)")
+                    it.copy(
+                        isAuthenticated = false,
+                        currentUserName = null,
+                        currentUserPhone = null,
+                        currentUserAvatar = null,
+                        currentUserBio = null,
+                        selectedChatId = null,
+                        chats = emptyList(),
+                        currentMessages = emptyList(),
+                        sessions = emptyList(),
+                        networkBannerMessage = null
+                    )
                 }
-                loadSessions() // refresh list
             } catch (e: Exception) {
                 Log.w("ChatViewModel", "logoutAllOtherDevices: ${e.message}")
+                _uiState.update {
+                    it.copy(networkBannerMessage = "Couldn't reach server: ${e.localizedMessage}")
+                }
             }
         }
     }
@@ -2026,14 +2042,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
      * Open "Saved Messages" — the private conversation with yourself.
-     * Tries GET /messages/conversations/{userId} to find or create it,
-     * then selects it as the active chat.
+     * Uses the dedicated GET /conversations/saved endpoint (spec §2)
+     * which the server returns (and creates if missing).
      */
     fun openSavedMessages() {
-        val myId = sessionManager.userId ?: return
         viewModelScope.launch {
             try {
-                val resp = ApiClient.service.getPrivateConversation(myId)
+                val resp = ApiClient.service.getSavedMessagesConversation()
                 if (resp.isSuccessful && resp.body() != null) {
                     val conv = resp.body()!!
                     // Make sure this conversation is in the chats list so
@@ -2045,11 +2060,179 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         } else state
                     }
                     selectChat(chatItem.id)
+                } else {
+                    _uiState.update {
+                        it.copy(networkBannerMessage = "Couldn't open Saved Messages (${resp.code()})")
+                    }
                 }
             } catch (e: Exception) {
                 Log.e("ChatViewModel", "openSavedMessages error", e)
+                _uiState.update {
+                    it.copy(networkBannerMessage = "Network error: ${e.localizedMessage}")
+                }
             }
         }
+    }
+
+    /**
+     * Read the device's contact list (ContactsContract) and ask the server
+     * which of those phone numbers belong to registered 7eve9Chat users.
+     * The returned list (POST /auth/check-contacts) is what the Contacts
+     * screen displays — only registered users, no raw device contacts.
+     *
+     * This requires the READ_CONTACTS runtime permission; if it isn't
+     * granted yet, the caller (ContactsScreen) should request it before
+     * calling this.
+     */
+    fun loadDeviceContacts() {
+        _uiState.update {
+            it.copy(isContactsLoading = true, contactsError = null, addContactStatus = null)
+        }
+        viewModelScope.launch {
+            try {
+                val ctx = getApplication<Application>()
+                val phones = readDevicePhoneNumbers(ctx)
+                if (phones.isEmpty()) {
+                    _uiState.update {
+                        it.copy(
+                            contacts = emptyList(),
+                            isContactsLoading = false,
+                            contactsError = "No contacts found on this device"
+                        )
+                    }
+                    return@launch
+                }
+                // Normalize each phone: strip +, spaces, leading 0; keep digits only.
+                val normalized = phones.map { raw ->
+                    var p = raw.replace("+", "").replace(" ", "").replace("-", "").trim()
+                    if (p.startsWith("00")) p = p.drop(2)
+                    p
+                }.filter { it.length >= 10 }.distinct()
+
+                val resp = ApiClient.service.checkContacts(
+                    com.example.data.api.CheckContactsRequest(phones = normalized)
+                )
+                if (resp.isSuccessful && resp.body() != null) {
+                    _uiState.update {
+                        it.copy(
+                            contacts = resp.body()!!,
+                            isContactsLoading = false,
+                            contactsError = null
+                        )
+                    }
+                } else {
+                    val err = parseErrorBody(resp.errorBody())
+                    _uiState.update {
+                        it.copy(
+                            isContactsLoading = false,
+                            contactsError = err ?: "Failed to sync contacts (${resp.code()})"
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "loadDeviceContacts error", e)
+                _uiState.update {
+                    it.copy(
+                        isContactsLoading = false,
+                        contactsError = "Network error: ${e.localizedMessage ?: "check connection"}"
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Open a private chat with the given contact by their userId.
+     * Calls GET /messages/conversations/{userId} (spec §3) to find or
+     * create the conversation, then selects it.
+     */
+    fun openPrivateChatWithContact(userId: String) {
+        viewModelScope.launch {
+            try {
+                val resp = ApiClient.service.getPrivateConversation(userId)
+                if (resp.isSuccessful && resp.body() != null) {
+                    val conv = resp.body()!!
+                    val chatItem = mapApiConversationToChatItem(conv)
+                    _uiState.update { state ->
+                        if (state.chats.none { it.id == chatItem.id }) {
+                            state.copy(chats = listOf(chatItem) + state.chats)
+                        } else state
+                    }
+                    selectChat(chatItem.id)
+                }
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "openPrivateChatWithContact error", e)
+            }
+        }
+    }
+
+    /**
+     * Create a new group conversation. Calls POST /conversations/group
+     * (spec §2) with the given name, type and optional participant ids.
+     */
+    fun createGroup(
+        name: String,
+        type: String = "group",
+        participantIds: List<String> = emptyList(),
+        description: String? = null
+    ) {
+        viewModelScope.launch {
+            try {
+                val resp = ApiClient.service.createGroup(
+                    com.example.data.api.CreateConversationRequest(
+                        name = name,
+                        type = type,
+                        description = description,
+                        participants = participantIds
+                    )
+                )
+                if (resp.isSuccessful && resp.body() != null) {
+                    val conv = resp.body()!!
+                    val chatItem = mapApiConversationToChatItem(conv)
+                    _uiState.update { state ->
+                        state.copy(chats = listOf(chatItem) + state.chats)
+                    }
+                    selectChat(chatItem.id)
+                } else {
+                    val err = parseErrorBody(resp.errorBody())
+                    _uiState.update {
+                        it.copy(networkBannerMessage = "Couldn't create group: ${err ?: "code ${resp.code()}"}")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "createGroup error", e)
+                _uiState.update {
+                    it.copy(networkBannerMessage = "Network error: ${e.localizedMessage}")
+                }
+            }
+        }
+    }
+
+    /**
+     * Read all phone numbers from the device's ContactsContract.
+     * Returns raw strings (caller normalizes them).
+     */
+    private fun readDevicePhoneNumbers(ctx: android.content.Context): List<String> {
+        val numbers = mutableSetOf<String>()
+        try {
+            val cursor = ctx.contentResolver.query(
+                android.provider.ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                arrayOf(android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER),
+                null, null, null
+            )
+            cursor?.use {
+                val idx = it.getColumnIndex(android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER)
+                while (it.moveToNext()) {
+                    if (idx >= 0) {
+                        val num = it.getString(idx) ?: continue
+                        if (num.isNotBlank()) numbers.add(num)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w("ChatViewModel", "readDevicePhoneNumbers: ${e.message}")
+        }
+        return numbers.toList()
     }
 
     // =============================================================

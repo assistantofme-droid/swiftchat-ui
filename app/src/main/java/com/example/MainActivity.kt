@@ -212,10 +212,25 @@ private fun TelegramAppContent(viewModel: ChatViewModel) {
                                 errorMessage = uiState.contactsError,
                                 addContactStatus = uiState.addContactStatus,
                                 currentUserAvatarUrl = uiState.currentUserAvatar,
-                                onLaunchLoad = { viewModel.loadContacts() },
+                                onLaunchLoad = { viewModel.loadDeviceContacts() },
                                 onAddContact = { viewModel.addContact(it) },
                                 onClearAddStatus = { viewModel.clearAddContactStatus() },
                                 onSelectBottomNav = { viewModel.selectBottomNavIndex(it) },
+                                onContactClick = { contact ->
+                                    contact._id?.let { viewModel.openPrivateChatWithContact(it) }
+                                },
+                                onNewGroup = {
+                                    // Open a simple group creation dialog — wire up later
+                                    // For now just create a placeholder group with the user's name
+                                    // and a generic title.
+                                    viewModel.createGroup(name = "New Group")
+                                },
+                                onNewChannel = {
+                                    viewModel.createGroup(
+                                        name = "New Channel",
+                                        type = "channel"
+                                    )
+                                },
                                 selectedBottomNavIndex = 1
                             )
                             2 -> {
@@ -353,11 +368,6 @@ private fun TelegramAppContent(viewModel: ChatViewModel) {
                                 onBottomNavSelect = { viewModel.selectBottomNavIndex(it) },
                                 onChatClick = { chat ->
                                     viewModel.selectChat(chat.id)
-                                },
-                                onNewChatClick = {
-                                    if (uiState.chats.isNotEmpty()) {
-                                        viewModel.selectChat(uiState.chats.first().id)
-                                    }
                                 },
                                 onToggleTheme = { viewModel.toggleTheme() },
                                 onOpenSavedMessages = { viewModel.openSavedMessages() },

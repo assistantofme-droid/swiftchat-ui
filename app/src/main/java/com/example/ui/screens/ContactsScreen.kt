@@ -1,6 +1,11 @@
 package com.example.ui.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,20 +15,20 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Loudspeaker
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
@@ -36,6 +41,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -50,13 +56,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.api.ApiClient
+import androidx.core.content.ContextCompat
 import com.example.data.api.ApiContact
 import com.example.ui.components.AvatarView
 import com.example.ui.components.TelegramBottomNav
@@ -69,8 +74,17 @@ import com.example.ui.theme.TelegramTextPrimary
 import com.example.ui.theme.TelegramTextSecondary
 
 /**
- * Contacts screen — backed by GET /auth/contacts and POST /auth/contacts.
- * Shows real contacts from the server with a search bar and add-contact FAB.
+ * Contacts screen — shows REAL device contacts filtered down to only
+ * registered 7eve9Chat users. Per the user's spec:
+ *
+ *   - Search bar at the top
+ *   - New Group button
+ *   - New Channel button
+ *   - Below: list of device contacts who are registered users
+ *     (POST /auth/check-contacts returns only registered users)
+ *
+ * Tapping a contact opens a private chat with them via
+ * GET /messages/conversations/{userId}.
  */
 @Composable
 fun ContactsScreen(
@@ -83,14 +97,37 @@ fun ContactsScreen(
     onAddContact: (String) -> Unit,
     onClearAddStatus: () -> Unit,
     onSelectBottomNav: (Int) -> Unit,
+    onContactClick: (ApiContact) -> Unit,
+    onNewGroup: () -> Unit,
+    onNewChannel: () -> Unit,
     selectedBottomNavIndex: Int = 1
 ) {
+    val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     var query by remember { mutableStateOf("") }
     var showAddDialog by remember { mutableStateOf(false) }
+    var hasContactsPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) ==
+                PackageManager.PERMISSION_GRANTED
+        )
+    }
 
-    // Load contacts on first composition
-    LaunchedEffect(Unit) { onLaunchLoad() }
+    val contactsPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        hasContactsPermission = granted
+        if (granted) onLaunchLoad()
+    }
+
+    // First time the screen is shown: ask for contacts permission + load
+    LaunchedEffect(Unit) {
+        if (hasContactsPermission) {
+            onLaunchLoad()
+        } else {
+            contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+        }
+    }
 
     // Show add-contact feedback as a snackbar
     LaunchedEffect(addContactStatus) {
@@ -112,9 +149,7 @@ fun ContactsScreen(
     Scaffold(
         containerColor = TelegramChatListBg,
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            ContactsHeader()
-        },
+        topBar = { ContactsHeader() },
         bottomBar = {
             TelegramBottomNav(
                 selectedIndex = selectedBottomNavIndex,
@@ -143,7 +178,33 @@ fun ContactsScreen(
             Column(modifier = Modifier.fillMaxSize()) {
                 SearchBar(query = query, onQueryChange = { query = it })
 
+                // === New Group / New Channel buttons ===
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    ActionChip(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Default.Group,
+                        label = "New Group",
+                        onClick = onNewGroup
+                    )
+                    ActionChip(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Default.Loudspeaker,
+                        label = "New Channel",
+                        onClick = onNewChannel
+                    )
+                }
+
                 when {
+                    !hasContactsPermission -> {
+                        PermissionPrompt(
+                            onAllow = { contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS) }
+                        )
+                    }
                     isLoading -> {
                         Box(
                             modifier = Modifier.fillMaxSize(),
@@ -155,7 +216,7 @@ fun ContactsScreen(
                     errorMessage != null && contacts.isEmpty() -> {
                         ErrorState(
                             message = errorMessage,
-                            onRetry = onLaunchLoad
+                            onRetry = { onLaunchLoad() }
                         )
                     }
                     filtered.isEmpty() && contacts.isNotEmpty() -> {
@@ -163,22 +224,14 @@ fun ContactsScreen(
                     }
                     filtered.isEmpty() -> {
                         EmptyState(
-                            message = "No contacts yet. Tap + to add your first contact."
+                            message = "None of your device contacts are on 7eve9Chat yet. " +
+                                "Tap + to invite someone by username or phone."
                         )
                     }
                     else -> {
-                        // Section header
-                        Text(
-                            text = "Sorted by last seen time",
-                            color = TelegramPrimary,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 8.dp)
-                        )
-
                         LazyColumn(modifier = Modifier.fillMaxSize()) {
                             items(filtered, key = { it._id ?: it.username ?: it.phone ?: it.name ?: "" }) { contact ->
-                                ContactRow(contact = contact)
+                                ContactRow(contact = contact, onClick = { onContactClick(contact) })
                             }
                             item { Spacer(modifier = Modifier.height(80.dp)) }
                         }
@@ -231,7 +284,7 @@ private fun SearchBar(query: String, onQueryChange: (String) -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(horizontal = 16.dp, vertical = 4.dp)
     ) {
         TextField(
             value = query,
@@ -264,11 +317,49 @@ private fun SearchBar(query: String, onQueryChange: (String) -> Unit) {
 }
 
 @Composable
-private fun ContactRow(contact: ApiContact) {
+private fun ActionChip(
+    modifier: Modifier = Modifier,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit
+) {
+    Surface(
+        color = TelegramSurface,
+        shape = RoundedCornerShape(16.dp),
+        modifier = modifier
+            .height(52.dp)
+            .clickable(onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = TelegramPrimary,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = label,
+                color = TelegramTextPrimary,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun ContactRow(contact: ApiContact, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { /* could navigate to private chat with this user */ }
+            .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -311,7 +402,6 @@ private fun AddContactDialog(
     onAdd: (String) -> Unit
 ) {
     var identifier by remember { mutableStateOf("") }
-    val keyboard = LocalSoftwareKeyboardController.current
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -331,18 +421,6 @@ private fun AddContactDialog(
                     onValueChange = { identifier = it },
                     placeholder = { Text("989123456789 or @alice", color = TelegramTextMuted) },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Ascii,
-                        imeAction = ImeAction.Done
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onDone = {
-                            if (identifier.isNotBlank()) {
-                                onAdd(identifier.trim())
-                                keyboard?.hide()
-                            }
-                        }
-                    ),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = TelegramPrimary,
                         unfocusedBorderColor = TelegramSurfaceVariant,
@@ -357,10 +435,7 @@ private fun AddContactDialog(
         confirmButton = {
             TextButton(
                 onClick = {
-                    if (identifier.isNotBlank()) {
-                        onAdd(identifier.trim())
-                        keyboard?.hide()
-                    }
+                    if (identifier.isNotBlank()) onAdd(identifier.trim())
                 }
             ) { Text("Add", color = TelegramPrimary, fontWeight = FontWeight.SemiBold) }
         },
@@ -392,6 +467,34 @@ private fun EmptyState(message: String) {
                 fontSize = 14.sp,
                 modifier = Modifier.padding(horizontal = 32.dp)
             )
+        }
+    }
+}
+
+@Composable
+private fun PermissionPrompt(onAllow: () -> Unit) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                imageVector = Icons.Default.PersonAdd,
+                contentDescription = null,
+                tint = TelegramTextMuted,
+                modifier = Modifier.size(48.dp)
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Allow access to your contacts to see who's on 7eve9Chat",
+                color = TelegramTextSecondary,
+                fontSize = 14.sp,
+                modifier = Modifier.padding(horizontal = 32.dp)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            TextButton(onClick = onAllow) {
+                Text("Allow Contacts", color = TelegramPrimary, fontWeight = FontWeight.SemiBold)
+            }
         }
     }
 }
