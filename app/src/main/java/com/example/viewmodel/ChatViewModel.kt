@@ -125,13 +125,6 @@ data class ChatUiState(
     val powerDisableAnimations: Boolean = false,
     val powerDisableAutoplay: Boolean = false,
 
-    // 7eve9 AI Features
-    val smartRepliesEnabled: Boolean = false,
-    val messageSummaryEnabled: Boolean = false,
-    val autoTranslateEnabled: Boolean = false,
-    val voiceToTextEnabled: Boolean = false,
-    val smartSearchEnabled: Boolean = false,
-
     // Chat folders (local-only for now)
     val chatFolders: List<com.example.ui.screens.ChatFolder> = emptyList(),
     val showFolderTags: Boolean = false,
@@ -727,25 +720,27 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun mapApiConversationToChatItem(apiConv: ApiConversation): ChatItem {
         val currentUserId = sessionManager.userId
-        val otherParticipant = apiConv.participants?.firstOrNull { it.user?._id != currentUserId }
+        // Server returns participants as a flat List<ApiUser> (per
+        // /src/controllers/messageController.ts → populate('participants', ...)).
+        val otherParticipant = apiConv.participants?.firstOrNull { it._id != currentUserId }
 
         val title = when {
             !apiConv.name.isNullOrBlank() -> apiConv.name
             !otherParticipant?.name.isNullOrBlank() -> otherParticipant?.name!!
-            !otherParticipant?.user?.name.isNullOrBlank() -> otherParticipant?.user?.name!!
-            !otherParticipant?.user?.username.isNullOrBlank() -> otherParticipant?.user?.username!!
+            !otherParticipant?.username.isNullOrBlank() -> otherParticipant?.username!!
+            apiConv.type == "saved" -> "Saved Messages"
             else -> "7eve9Chat User"
         }
 
         val avatar = ApiClient.resolveUrl(
-            apiConv.avatar ?: otherParticipant?.avatar ?: otherParticipant?.user?.avatar
+            apiConv.avatar ?: otherParticipant?.avatar
         )
         val subtitle = apiConv.lastMessage?.text ?: "No messages yet"
         val time = formatApiTime(apiConv.lastMessage?.createdAt ?: apiConv.lastMessageAt)
         val unread = apiConv.unreadCount ?: 0
         val isPinned = apiConv.pinned == true
         val isMuted = apiConv.isMuted == true
-        val isGroup = apiConv.type != "private" && (apiConv.participants?.size ?: 0) > 2
+        val isGroup = apiConv.type != "private" && apiConv.type != "saved" && (apiConv.participants?.size ?: 0) > 2
         val isChannel = apiConv.isChannel == true || apiConv.type == "channel"
 
         return ChatItem(
@@ -760,8 +755,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             avatarType = AvatarType.MOTORCYCLE,
             isGroup = isGroup,
             memberCount = apiConv.participants?.size ?: 0,
-            isOnline = false
+            isOnline = otherParticipant?.let { isUserOnline(it) } ?: false
         )
+    }
+
+    /** Heuristic for "online" display — server's isOnline field if set. */
+    private fun isUserOnline(user: ApiUser): Boolean {
+        return user.isOnline == true
     }
 
     // =============================================================
@@ -1562,12 +1562,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val initial = UserProfileData(
             id = chat?.id ?: "unknown",
             name = chat?.title ?: "User",
-            username = chat?.title?.lowercase()?.replace(" ", "_"),
+            // No fake username — null until server provides one
+            username = null,
             phone = null,
             bio = null,
             avatarUrl = chat?.avatarUrl,
             avatarType = chat?.avatarType ?: AvatarType.MOTORCYCLE,
-            isOnline = false,
+            isOnline = chat?.isOnline == true,
             isSelf = false
         )
         _uiState.update { it.copy(profileUser = initial, isProfileModalOpen = true) }
@@ -1579,8 +1580,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 val convResp = ApiClient.service.getConversation(targetId ?: return@launch)
                 if (!convResp.isSuccessful || convResp.body() == null) return@launch
                 val conv = convResp.body()!!
-                val other = conv.participants?.firstOrNull { it.user?._id != sessionManager.userId }
-                val otherUserId = other?.user?._id ?: return@launch
+                // Server returns participants as a flat List<ApiUser>.
+                val other = conv.participants?.firstOrNull { it._id != sessionManager.userId }
+                val otherUserId = other?._id ?: return@launch
 
                 val userResp = ApiClient.service.getUser(otherUserId)
                 if (userResp.isSuccessful && userResp.body() != null) {
@@ -1593,7 +1595,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                                 username = u.username ?: it.profileUser?.username,
                                 phone = u.phone,
                                 bio = u.bio,
-                                avatarUrl = ApiClient.resolveUrl(u.avatar) ?: it.profileUser?.avatarUrl
+                                avatarUrl = ApiClient.resolveUrl(u.avatar) ?: it.profileUser?.avatarUrl,
+                                isOnline = u.isOnline == true
                             )
                         )
                     }
@@ -1610,9 +1613,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             name = sessionManager.name ?: "My Profile",
             username = sessionManager.username,
             phone = sessionManager.phone,
-            bio = sessionManager.bio ?: "Hey there! I am using 7eve9Chat.",
+            // No fake bio — null if user hasn't set one
+            bio = sessionManager.bio,
             avatarUrl = ApiClient.resolveUrl(sessionManager.avatar),
             avatarType = AvatarType.MOTORCYCLE,
+            // Current user is always "online" from their own perspective
             isOnline = true,
             isSelf = true
         )
@@ -1809,30 +1814,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     fun setPowerDisableAutoplay(v: Boolean) {
         sessionManager.powerDisableAutoplay = v
         _uiState.update { it.copy(powerDisableAutoplay = v) }
-    }
-
-    // ===== 7eve9 AI Features =====
-    // These are local-only preferences for now — server-side AI processing
-    // would be added in a future iteration.
-
-    fun setSmartReplies(v: Boolean) {
-        _uiState.update { it.copy(smartRepliesEnabled = v) }
-    }
-
-    fun setMessageSummary(v: Boolean) {
-        _uiState.update { it.copy(messageSummaryEnabled = v) }
-    }
-
-    fun setAutoTranslate(v: Boolean) {
-        _uiState.update { it.copy(autoTranslateEnabled = v) }
-    }
-
-    fun setVoiceToText(v: Boolean) {
-        _uiState.update { it.copy(voiceToTextEnabled = v) }
-    }
-
-    fun setSmartSearch(v: Boolean) {
-        _uiState.update { it.copy(smartSearchEnabled = v) }
     }
 
     // ===== Chat folders (local-only) =====
@@ -2146,7 +2127,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     /**
      * Open a private chat with the given contact by their userId.
      * Calls GET /messages/conversations/{userId} (spec §3) to find or
-     * create the conversation, then selects it.
+     * create the conversation, then selects it AND switches to the Chats
+     * tab so the user actually sees the chat open.
      */
     fun openPrivateChatWithContact(userId: String) {
         viewModelScope.launch {
@@ -2156,14 +2138,29 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     val conv = resp.body()!!
                     val chatItem = mapApiConversationToChatItem(conv)
                     _uiState.update { state ->
-                        if (state.chats.none { it.id == chatItem.id }) {
-                            state.copy(chats = listOf(chatItem) + state.chats)
-                        } else state
+                        state.copy(
+                            chats = if (state.chats.none { it.id == chatItem.id }) {
+                                listOf(chatItem) + state.chats
+                            } else {
+                                state.chats.map { if (it.id == chatItem.id) chatItem else it }
+                            },
+                            // Force-switch to Chats tab so the chat actually opens
+                            // even if the user is currently on Contacts/Settings/Profile.
+                            selectedBottomNavIndex = 0
+                        )
                     }
                     selectChat(chatItem.id)
+                } else {
+                    val err = parseErrorBody(resp.errorBody())
+                    _uiState.update {
+                        it.copy(networkBannerMessage = "Couldn't open chat: ${err ?: "code ${resp.code()}"}")
+                    }
                 }
             } catch (e: Exception) {
                 Log.e("ChatViewModel", "openPrivateChatWithContact error", e)
+                _uiState.update {
+                    it.copy(networkBannerMessage = "Network error: ${e.localizedMessage}")
+                }
             }
         }
     }

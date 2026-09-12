@@ -102,6 +102,7 @@ fun ChatListScreen(
     currentUserName: String? = null,
     currentUserPhone: String? = null,
     currentUserAvatar: String? = null,
+    folders: List<ChatFolder> = emptyList(),
     onSearchToggle: (Boolean) -> Unit,
     onSearchQueryChange: (String) -> Unit,
     onCategoryTabSelect: (String) -> Unit,
@@ -265,41 +266,27 @@ fun ChatListScreen(
                     .padding(horizontal = 12.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // "All Chats" pill with counter "336"
+                // "All Chats" pill — always present, no fake badge count
                 CategoryPillTab(
                     title = "All Chats",
-                    badge = "336",
+                    badge = null,
                     isSelected = selectedCategoryTab == "All Chats",
                     isDarkMode = isDarkMode,
                     onClick = { onCategoryTabSelect("All Chats") }
                 )
 
-                // "Personal" pill
-                CategoryPillTab(
-                    title = "Personal",
-                    badge = null,
-                    isSelected = selectedCategoryTab == "Personal",
-                    isDarkMode = isDarkMode,
-                    onClick = { onCategoryTabSelect("Personal") }
-                )
-
-                // "Channels" pill
-                CategoryPillTab(
-                    title = "Channels",
-                    badge = "42",
-                    isSelected = selectedCategoryTab == "Channels",
-                    isDarkMode = isDarkMode,
-                    onClick = { onCategoryTabSelect("Channels") }
-                )
-
-                // "Groups" pill
-                CategoryPillTab(
-                    title = "Groups",
-                    badge = "12",
-                    isSelected = selectedCategoryTab == "Groups",
-                    isDarkMode = isDarkMode,
-                    onClick = { onCategoryTabSelect("Groups") }
-                )
+                // User's custom folders from ChatFoldersScreen (added via
+                // viewModel.addChatFolder(name)). No fake default folders —
+                // the user must explicitly create them in Chat Folders settings.
+                folders.forEach { folder ->
+                    CategoryPillTab(
+                        title = folder.name,
+                        badge = null,
+                        isSelected = selectedCategoryTab == folder.name,
+                        isDarkMode = isDarkMode,
+                        onClick = { onCategoryTabSelect(folder.name) }
+                    )
+                }
             }
 
             // Chat List Items

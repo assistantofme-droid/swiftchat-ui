@@ -74,6 +74,9 @@ data class ApiUser(
     @Json(name = "isOwner") val isOwner: Boolean? = false,
     @Json(name = "isPhoneHidden") val isPhoneHidden: Boolean? = false,
     @Json(name = "isNewUser") val isNewUser: Boolean? = false,
+    @Json(name = "isOnline") val isOnline: Boolean? = false,
+    @Json(name = "lastSeen") val lastSeen: String? = null,
+    @Json(name = "isBot") val isBot: Boolean? = false,
     @Json(name = "profileColor") val profileColor: String? = null,
     @Json(name = "birthday") val birthday: String? = null,
     @Json(name = "profileActiveSong") val profileActiveSong: ApiProfileSong? = null,
@@ -119,17 +122,6 @@ data class CheckContactsRequest(
 // =============================================================
 
 @JsonClass(generateAdapter = true)
-data class ApiParticipant(
-    @Json(name = "_id") val _id: String? = null,
-    @Json(name = "user") val user: ApiUser? = null,
-    @Json(name = "name") val name: String? = null,
-    @Json(name = "avatar") val avatar: String? = null,
-    @Json(name = "role") val role: String? = null,
-    @Json(name = "isAdmin") val isAdmin: Boolean? = false,
-    @Json(name = "customTitle") val customTitle: String? = null
-)
-
-@JsonClass(generateAdapter = true)
 data class ApiLastMessage(
     @Json(name = "_id") val _id: String? = null,
     @Json(name = "text") val text: String? = null,
@@ -143,6 +135,12 @@ data class ApiLastMessage(
     // chat list UI, so it's safer to just drop it.
 )
 
+/**
+ * Conversation model. Per the actual server source code in
+ * /src/controllers/messageController.ts → getConversation/getConversations,
+ * `participants` is populated as a FLAT array of User objects (not wrapped
+ * in a {user: ApiUser} sub-object). So we type it as List<ApiUser>.
+ */
 @JsonClass(generateAdapter = true)
 data class ApiConversation(
     @Json(name = "_id") val _id: String,
@@ -151,7 +149,7 @@ data class ApiConversation(
     @Json(name = "description") val description: String? = null,
     @Json(name = "avatar") val avatar: String? = null,
     @Json(name = "handle") val handle: String? = null,
-    @Json(name = "participants") val participants: List<ApiParticipant>? = emptyList(),
+    @Json(name = "participants") val participants: List<ApiUser>? = emptyList(),
     @Json(name = "owner") val owner: ApiUser? = null,
     @Json(name = "admins") val admins: List<ApiUser>? = emptyList(),
     @Json(name = "lastMessage") val lastMessage: ApiLastMessage? = null,

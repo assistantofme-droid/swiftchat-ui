@@ -219,17 +219,8 @@ private fun TelegramAppContent(viewModel: ChatViewModel) {
                                 onContactClick = { contact ->
                                     contact._id?.let { viewModel.openPrivateChatWithContact(it) }
                                 },
-                                onNewGroup = {
-                                    // Open a simple group creation dialog — wire up later
-                                    // For now just create a placeholder group with the user's name
-                                    // and a generic title.
-                                    viewModel.createGroup(name = "New Group")
-                                },
-                                onNewChannel = {
-                                    viewModel.createGroup(
-                                        name = "New Channel",
-                                        type = "channel"
-                                    )
+                                onCreateGroup = { name, type, description ->
+                                    viewModel.createGroup(name = name, type = type, description = description)
                                 },
                                 selectedBottomNavIndex = 1
                             )
@@ -315,20 +306,6 @@ private fun TelegramAppContent(viewModel: ChatViewModel) {
                                             onSelectLanguage = { viewModel.setLanguage(it) },
                                             onBack = { viewModel.closeSettingsScreen() }
                                         )
-                                    com.example.ui.screens.SettingsRoute.FEATURES ->
-                                        com.example.ui.screens.SevenEve9FeaturesScreen(
-                                            smartRepliesEnabled = uiState.smartRepliesEnabled,
-                                            messageSummaryEnabled = uiState.messageSummaryEnabled,
-                                            autoTranslateEnabled = uiState.autoTranslateEnabled,
-                                            voiceToTextEnabled = uiState.voiceToTextEnabled,
-                                            smartSearchEnabled = uiState.smartSearchEnabled,
-                                            onSetSmartReplies = { viewModel.setSmartReplies(it) },
-                                            onSetMessageSummary = { viewModel.setMessageSummary(it) },
-                                            onSetAutoTranslate = { viewModel.setAutoTranslate(it) },
-                                            onSetVoiceToText = { viewModel.setVoiceToText(it) },
-                                            onSetSmartSearch = { viewModel.setSmartSearch(it) },
-                                            onBack = { viewModel.closeSettingsScreen() }
-                                        )
                                     else -> com.example.ui.screens.SettingsScreen(
                                         meUser = uiState.meUser,
                                         currentUserAvatarUrl = uiState.currentUserAvatar,
@@ -362,6 +339,7 @@ private fun TelegramAppContent(viewModel: ChatViewModel) {
                                 currentUserName = uiState.currentUserName,
                                 currentUserPhone = uiState.currentUserPhone,
                                 currentUserAvatar = uiState.currentUserAvatar,
+                                folders = uiState.chatFolders,
                                 onSearchToggle = { viewModel.setSearching(it) },
                                 onSearchQueryChange = { viewModel.updateSearchQuery(it) },
                                 onCategoryTabSelect = { viewModel.selectCategoryTab(it) },

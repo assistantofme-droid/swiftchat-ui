@@ -98,14 +98,15 @@ fun ContactsScreen(
     onClearAddStatus: () -> Unit,
     onSelectBottomNav: (Int) -> Unit,
     onContactClick: (ApiContact) -> Unit,
-    onNewGroup: () -> Unit,
-    onNewChannel: () -> Unit,
+    onCreateGroup: (name: String, type: String, description: String?) -> Unit,
     selectedBottomNavIndex: Int = 1
 ) {
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     var query by remember { mutableStateOf("") }
     var showAddDialog by remember { mutableStateOf(false) }
+    var showCreateGroupDialog by remember { mutableStateOf(false) }
+    var showCreateChannelDialog by remember { mutableStateOf(false) }
     var hasContactsPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) ==
@@ -189,13 +190,13 @@ fun ContactsScreen(
                         modifier = Modifier.weight(1f),
                         icon = Icons.Default.Group,
                         label = "New Group",
-                        onClick = onNewGroup
+                        onClick = { showCreateGroupDialog = true }
                     )
                     ActionChip(
                         modifier = Modifier.weight(1f),
                         icon = Icons.Default.Campaign,
                         label = "New Channel",
-                        onClick = onNewChannel
+                        onClick = { showCreateChannelDialog = true }
                     )
                 }
 
@@ -250,6 +251,99 @@ fun ContactsScreen(
             }
         )
     }
+
+    if (showCreateGroupDialog) {
+        CreateConversationDialog(
+            title = "New Group",
+            type = "group",
+            onDismiss = { showCreateGroupDialog = false },
+            onCreate = { name, type, description ->
+                onCreateGroup(name, type, description)
+                showCreateGroupDialog = false
+            }
+        )
+    }
+
+    if (showCreateChannelDialog) {
+        CreateConversationDialog(
+            title = "New Channel",
+            type = "channel",
+            onDismiss = { showCreateChannelDialog = false },
+            onCreate = { name, type, description ->
+                onCreateGroup(name, type, description)
+                showCreateChannelDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+private fun CreateConversationDialog(
+    title: String,
+    type: String,
+    onDismiss: () -> Unit,
+    onCreate: (name: String, type: String, description: String?) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = TelegramSurface,
+        titleContentColor = TelegramTextPrimary,
+        title = { Text(title, color = TelegramTextPrimary, fontWeight = FontWeight.Bold) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it.take(64) },
+                    label = { Text("Name", color = TelegramTextSecondary) },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = TelegramPrimary,
+                        unfocusedBorderColor = TelegramSurfaceVariant,
+                        focusedTextColor = TelegramTextPrimary,
+                        unfocusedTextColor = TelegramTextPrimary,
+                        cursorColor = TelegramPrimary
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it.take(255) },
+                    label = { Text("Description (optional)", color = TelegramTextSecondary) },
+                    maxLines = 3,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = TelegramPrimary,
+                        unfocusedBorderColor = TelegramSurfaceVariant,
+                        focusedTextColor = TelegramTextPrimary,
+                        unfocusedTextColor = TelegramTextPrimary,
+                        cursorColor = TelegramPrimary
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (name.isNotBlank()) {
+                        onCreate(
+                            name.trim(),
+                            type,
+                            description.takeIf { it.isNotBlank() }
+                        )
+                    }
+                }
+            ) { Text("Create", color = TelegramPrimary, fontWeight = FontWeight.SemiBold) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = TelegramTextSecondary)
+            }
+        }
+    )
 }
 
 @Composable

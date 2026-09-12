@@ -17,7 +17,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Devices
@@ -58,7 +57,6 @@ object SettingsRoute {
     const val DEVICES = "devices"
     const val POWER = "power"
     const val LANGUAGE = "language"
-    const val FEATURES = "features"
 }
 
 @Composable
@@ -187,61 +185,6 @@ fun SettingsScreen(
                         subtitle = "Chat with @7eve9 support",
                         onClick = onAskQuestion
                     )
-                }
-            }
-
-            item { Spacer(modifier = Modifier.height(12.dp)) }
-
-            // === 7eve9 Features toggle ===
-            item {
-                SettingsCard {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onOpenRoute(SettingsRoute.FEATURES) }
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(
-                                    androidx.compose.ui.graphics.Brush.horizontalGradient(
-                                        listOf(Color(0xFF7B68EE), Color(0xFF50A7EA))
-                                    )
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.AutoAwesome,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.size(16.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "7eve9Chat Features",
-                                color = TelegramTextPrimary,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "AI-powered smart replies, summaries, translation",
-                                color = TelegramTextSecondary,
-                                fontSize = 13.sp
-                            )
-                        }
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                            contentDescription = null,
-                            tint = TelegramTextSecondary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
                 }
             }
 

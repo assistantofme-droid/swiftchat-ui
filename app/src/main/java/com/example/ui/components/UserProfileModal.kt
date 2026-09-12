@@ -85,9 +85,10 @@ data class UserProfileData(
     val bio: String? = null,
     val avatarUrl: String? = null,
     val avatarType: AvatarType = AvatarType.MOTORCYCLE,
-    val isOnline: Boolean = true,
+    val isOnline: Boolean = false,
     val isSelf: Boolean = false,
-    val birthday: String? = "Aug 23"
+    // No default fake birthday — null means "not set" and the UI hides the row.
+    val birthday: String? = null
 )
 
 @Composable
@@ -225,7 +226,7 @@ fun UserProfileModal(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = if (user.isOnline) "1 online" else "last seen recently",
+                            text = if (user.isOnline) "online" else "last seen recently",
                             color = Color(0xFF4CAF50),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold
@@ -262,78 +263,83 @@ fun UserProfileModal(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Info Card: Mobile, Bio, Username, Birthday matching Screenshot 5
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(Color(0x33202E3D))
-                        .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(20.dp))
-                        .padding(horizontal = 16.dp, vertical = 10.dp)
-                ) {
-                    // Mobile
-                    ProfileInfoRow(
-                        title = user.phone ?: "+98 912 345 6789",
-                        subtitle = "Mobile",
-                        trailingAction = {
-                            IconButton(
-                                onClick = {
-                                    clipboardManager.setText(AnnotatedString(user.phone ?: "+98 912 345 6789"))
-                                },
-                                modifier = Modifier.size(28.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.ContentCopy,
-                                    contentDescription = "Copy phone",
-                                    tint = TelegramTextSecondary,
-                                    modifier = Modifier.size(16.dp)
+                // Info Card: Mobile, Bio, Username, Birthday — each row only shows
+                // if the user actually has that field set on the server. No fake
+                // placeholders, no fake phone numbers.
+                val visibleInfoRows = buildList {
+                    if (!user.phone.isNullOrBlank()) add("phone")
+                    if (!user.bio.isNullOrBlank()) add("bio")
+                    if (!user.username.isNullOrBlank()) add("username")
+                    if (!user.birthday.isNullOrBlank()) add("birthday")
+                }
+
+                if (visibleInfoRows.isNotEmpty()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color(0x33202E3D))
+                            .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(20.dp))
+                            .padding(horizontal = 16.dp, vertical = 10.dp)
+                    ) {
+                        visibleInfoRows.forEachIndexed { index, key ->
+                            when (key) {
+                                "phone" -> ProfileInfoRow(
+                                    title = user.phone.orEmpty(),
+                                    subtitle = "Mobile",
+                                    trailingAction = {
+                                        IconButton(
+                                            onClick = {
+                                                clipboardManager.setText(AnnotatedString(user.phone.orEmpty()))
+                                            },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.ContentCopy,
+                                                contentDescription = "Copy phone",
+                                                tint = TelegramTextSecondary,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                )
+                                "bio" -> ProfileInfoRow(
+                                    title = user.bio.orEmpty(),
+                                    subtitle = "Bio"
+                                )
+                                "username" -> ProfileInfoRow(
+                                    title = "@${user.username}",
+                                    subtitle = "Username",
+                                    trailingAction = {
+                                        IconButton(onClick = {}, modifier = Modifier.size(28.dp)) {
+                                            Icon(
+                                                imageVector = Icons.Default.QrCode,
+                                                contentDescription = "QR Code",
+                                                tint = TelegramPrimary,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+                                )
+                                "birthday" -> ProfileInfoRow(
+                                    title = user.birthday.orEmpty(),
+                                    subtitle = "Birthday",
+                                    trailingAction = {
+                                        Icon(
+                                            imageVector = Icons.Default.Cake,
+                                            contentDescription = "Birthday",
+                                            tint = Color(0xFFFFB300),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
                                 )
                             }
-                        }
-                    )
-
-                    HorizontalDivider(color = Color.White.copy(alpha = 0.08f), modifier = Modifier.padding(vertical = 4.dp))
-
-                    // Bio
-                    ProfileInfoRow(
-                        title = user.bio ?: "Hey there! I am using Telegram.",
-                        subtitle = "Bio"
-                    )
-
-                    HorizontalDivider(color = Color.White.copy(alpha = 0.08f), modifier = Modifier.padding(vertical = 4.dp))
-
-                    // Username with QR icon
-                    ProfileInfoRow(
-                        title = if (!user.username.isNullOrBlank()) "@${user.username}" else "@username",
-                        subtitle = "Username",
-                        trailingAction = {
-                            IconButton(onClick = {}, modifier = Modifier.size(28.dp)) {
-                                Icon(
-                                    imageVector = Icons.Default.QrCode,
-                                    contentDescription = "QR Code",
-                                    tint = TelegramPrimary,
-                                    modifier = Modifier.size(18.dp)
-                                )
+                            if (index < visibleInfoRows.size - 1) {
+                                HorizontalDivider(color = Color.White.copy(alpha = 0.08f), modifier = Modifier.padding(vertical = 4.dp))
                             }
                         }
-                    )
-
-                    HorizontalDivider(color = Color.White.copy(alpha = 0.08f), modifier = Modifier.padding(vertical = 4.dp))
-
-                    // Birthday
-                    ProfileInfoRow(
-                        title = user.birthday ?: "Aug 23",
-                        subtitle = "Birthday",
-                        trailingAction = {
-                            Icon(
-                                imageVector = Icons.Default.Cake,
-                                contentDescription = "Birthday",
-                                tint = Color(0xFFFFB300),
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
@@ -370,67 +376,34 @@ fun UserProfileModal(
                     Spacer(modifier = Modifier.height(14.dp))
 
                     if (selectedTab == 0) {
-                        // Gifts Grid matching Screenshot 5
-                        val gifts = listOf(
-                            Triple("🏆", "Golden Cup", "Rare"),
-                            Triple("🎂", "Sweet Cake", "Celebration"),
-                            Triple("💖", "Heart Glow", "Special"),
-                            Triple("🍾", "Champagne", "Party"),
-                            Triple("💎", "Diamond Star", "Ultra"),
-                            Triple("🚀", "Rocket Blast", "Epic")
-                        )
-
-                        LazyVerticalGrid(
-                            columns = GridCells.Fixed(3),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        // Gifts — no fake list. Show an empty state until the
+                        // server returns real gifts via GET /gifts/user/{id}.
+                        // (Future: wire that up. For now, this is honest.)
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(210.dp)
+                                .height(180.dp),
+                            contentAlignment = Alignment.Center
                         ) {
-                            items(gifts) { gift ->
-                                Column(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(16.dp))
-                                        .background(Color(0x33202E3D))
-                                        .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(16.dp))
-                                    .padding(vertical = 12.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text(text = gift.first, fontSize = 30.sp)
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = gift.second,
-                                        color = TelegramTextPrimary,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                    Text(
-                                        text = gift.third,
-                                        color = TelegramPrimary,
-                                        fontSize = 10.sp
-                                    )
-                                }
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "🎁",
+                                    fontSize = 36.sp
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "No gifts yet",
+                                    color = TelegramTextPrimary,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Gifts sent to ${user.name} will appear here.",
+                                    color = TelegramTextMuted,
+                                    fontSize = 12.sp
+                                )
                             }
-                        }
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        // Floating Send Gift Button matching Screenshot 5
-                        Button(
-                            onClick = {},
-                            shape = RoundedCornerShape(20.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = TelegramPrimary),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp)
-                        ) {
-                            Text(
-                                text = "🎁  Send a Gift to ${user.name}",
-                                color = Color.White,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold
-                            )
                         }
                     } else {
                         Box(
