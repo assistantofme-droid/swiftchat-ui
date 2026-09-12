@@ -16,6 +16,7 @@ class SessionManager(context: Context) {
         private const val KEY_AVATAR = "user_avatar"
         private const val KEY_BIO = "user_bio"
         private const val KEY_IS_LOGGED_IN = "is_logged_in"
+        private const val KEY_IS_DARK_MODE = "is_dark_mode"
     }
 
     var token: String?
@@ -49,6 +50,10 @@ class SessionManager(context: Context) {
     var isLoggedIn: Boolean
         get() = prefs.getBoolean(KEY_IS_LOGGED_IN, false) && !token.isNullOrBlank()
         set(value) = prefs.edit().putBoolean(KEY_IS_LOGGED_IN, value).apply()
+
+    var isDarkMode: Boolean
+        get() = prefs.getBoolean(KEY_IS_DARK_MODE, true)
+        set(value) = prefs.edit().putBoolean(KEY_IS_DARK_MODE, value).apply()
 
     fun saveSession(
         token: String,

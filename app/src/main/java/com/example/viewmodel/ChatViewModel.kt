@@ -98,7 +98,10 @@ data class ChatUiState(
     val isMeLoading: Boolean = false,
 
     // Owned channel (for Profile screen channel card) — first channel where user is owner
-    val myChannel: ApiConversation? = null
+    val myChannel: ApiConversation? = null,
+
+    // Theme — toggled from the chat list 3-dot menu
+    val isDarkMode: Boolean = true
 )
 
 class ChatViewModel(application: Application) : AndroidViewModel(application) {
@@ -120,7 +123,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 currentUserName = sessionManager.name,
                 currentUserPhone = sessionManager.phone,
                 currentUserAvatar = sessionManager.avatar,
-                currentUserBio = sessionManager.bio
+                currentUserBio = sessionManager.bio,
+                isDarkMode = sessionManager.isDarkMode
             )
         }
 
@@ -1522,6 +1526,44 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updateSearchQuery(query: String) {
         _uiState.update { it.copy(searchQuery = query) }
+    }
+
+    // =============================================================
+    // Theme toggle (Dark / Light) — persisted in SessionManager
+    // =============================================================
+
+    fun toggleTheme() {
+        val newMode = !_uiState.value.isDarkMode
+        sessionManager.isDarkMode = newMode
+        _uiState.update { it.copy(isDarkMode = newMode) }
+    }
+
+    /**
+     * Open "Saved Messages" — the private conversation with yourself.
+     * Tries GET /messages/conversations/{userId} to find or create it,
+     * then selects it as the active chat.
+     */
+    fun openSavedMessages() {
+        val myId = sessionManager.userId ?: return
+        viewModelScope.launch {
+            try {
+                val resp = ApiClient.service.getPrivateConversation(myId)
+                if (resp.isSuccessful && resp.body() != null) {
+                    val conv = resp.body()!!
+                    // Make sure this conversation is in the chats list so
+                    // ChatDetailScreen can find it.
+                    val chatItem = mapApiConversationToChatItem(conv)
+                    _uiState.update { state ->
+                        if (state.chats.none { it.id == chatItem.id }) {
+                            state.copy(chats = listOf(chatItem) + state.chats)
+                        } else state
+                    }
+                    selectChat(chatItem.id)
+                }
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "openSavedMessages error", e)
+            }
+        }
     }
 
     // =============================================================

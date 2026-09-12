@@ -116,8 +116,13 @@ data class ApiLastMessage(
     @Json(name = "_id") val _id: String? = null,
     @Json(name = "text") val text: String? = null,
     @Json(name = "type") val type: String? = null,
-    @Json(name = "createdAt") val createdAt: String? = null,
-    @Json(name = "sender") val sender: ApiUser? = null
+    @Json(name = "createdAt") val createdAt: String? = null
+    // NOTE: `sender` intentionally omitted — the server may return it as either
+    // an ApiUser object (spec §8.3) or a bare String user-id (some implementations
+    // of §3.4). Having a typed field here would cause Moshi to fail parsing the
+    // entire conversation list when the shape doesn't match, resulting in an
+    // empty chat list. We don't use lastMessage.sender for anything in the
+    // chat list UI, so it's safer to just drop it.
 )
 
 @JsonClass(generateAdapter = true)

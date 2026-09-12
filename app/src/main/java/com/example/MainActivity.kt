@@ -14,7 +14,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -34,7 +33,6 @@ import com.example.ui.screens.LoginScreen
 import com.example.ui.screens.ProfileScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.theme.MyApplicationTheme
-import com.example.ui.theme.TelegramDarkBg
 import com.example.viewmodel.ChatViewModel
 
 class MainActivity : ComponentActivity() {
@@ -45,14 +43,7 @@ class MainActivity : ComponentActivity() {
         MediaNotificationHelper.createNotificationChannel(this)
 
         setContent {
-            MyApplicationTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = TelegramDarkBg
-                ) {
-                    TelegramApp()
-                }
-            }
+            TelegramApp()
         }
     }
 
@@ -86,6 +77,18 @@ class MainActivity : ComponentActivity() {
 fun TelegramApp(
     viewModel: ChatViewModel = viewModel()
 ) {
+    val context = LocalContext.current
+    val uiState by viewModel.uiState.collectAsState()
+    val callState by CallManager.callState.collectAsState()
+
+    // Theme follows the user's Dark/Light toggle.
+    MyApplicationTheme(isDarkMode = uiState.isDarkMode) {
+        TelegramAppContent(viewModel = viewModel)
+    }
+}
+
+@Composable
+private fun TelegramAppContent(viewModel: ChatViewModel) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val callState by CallManager.callState.collectAsState()
@@ -226,12 +229,11 @@ fun TelegramApp(
                                 selectedBottomNavIndex = uiState.selectedBottomNavIndex,
                                 isSearching = uiState.isSearching,
                                 searchQuery = uiState.searchQuery,
+                                isDarkMode = uiState.isDarkMode,
                                 isRefreshing = uiState.isRefreshing,
                                 currentUserName = uiState.currentUserName,
                                 currentUserPhone = uiState.currentUserPhone,
                                 currentUserAvatar = uiState.currentUserAvatar,
-                                onRefresh = { viewModel.refreshConversations() },
-                                onLogout = { viewModel.logout() },
                                 onSearchToggle = { viewModel.setSearching(it) },
                                 onSearchQueryChange = { viewModel.updateSearchQuery(it) },
                                 onCategoryTabSelect = { viewModel.selectCategoryTab(it) },
@@ -243,7 +245,10 @@ fun TelegramApp(
                                     if (uiState.chats.isNotEmpty()) {
                                         viewModel.selectChat(uiState.chats.first().id)
                                     }
-                                }
+                                },
+                                onToggleTheme = { viewModel.toggleTheme() },
+                                onOpenSavedMessages = { viewModel.openSavedMessages() },
+                                onNewGroup = { /* TODO: open group creation flow — future update */ }
                             )
                         }
 

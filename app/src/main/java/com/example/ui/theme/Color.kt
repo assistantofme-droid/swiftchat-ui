@@ -66,3 +66,29 @@ val TelegramTextMuted = Color(0xFF5E6D7E)
 val TelegramSheetBg = Color(0xF2141D26)
 val TelegramSheetItemBg = Color(0xFF202C3A)
 val TelegramSheetBorder = Color(0x2EFFFFFF)
+
+// ============================================================
+// Light Mode Palette — used by ChatListScreen + child screens
+// when isDarkMode = false. Components read these to swap backgrounds
+// and text colors without needing a full MaterialTheme rebuild.
+// ============================================================
+val LightBg = Color(0xFFF0F2F5)
+val LightChatListBg = Color(0xFFF0F2F5)
+val LightSurface = Color(0xFFFFFFFF)
+val LightSurfaceVariant = Color(0xFFE9EBEE)
+val LightGlassHeader = Color(0xFFFFFFFF)
+val LightGlassBorder = Color(0x1A000000)
+val LightPrimary = Color(0xFF2A9CE0)
+val LightAccent = Color(0xFF36A8F2)
+val LightTextPrimary = Color(0xFF1B1D22)
+val LightTextSecondary = Color(0xFF65758A)
+val LightTextMuted = Color(0xFF8E9BAA)
+val LightUnreadBadge = Color(0xFF2A9CE0)
+val LightUnreadBadgeText = Color(0xFFFFFFFF)
+val LightCheckBlue = Color(0xFF2A9CE0)
+val LightPinIcon = Color(0xFF8E9BAA)
+val LightTypingCyan = Color(0xFF2A9CE0)
+val LightOutgoingBubble = Color(0xFFE0F0FB)
+val LightOutgoingBubbleEnd = Color(0xFFCFE7F8)
+val LightIncomingBubble = Color(0xFFFFFFFF)
+

@@ -1,11 +1,6 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -33,34 +28,25 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.FlashOn
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VolumeOff
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.automirrored.filled.ExitToApp
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
@@ -70,7 +56,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
@@ -78,9 +63,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.model.AvatarType
 import com.example.data.model.ChatItem
 import com.example.ui.components.AvatarView
+import com.example.ui.theme.LightChatListBg
+import com.example.ui.theme.LightCheckBlue
+import com.example.ui.theme.LightGlassBorder
+import com.example.ui.theme.LightGlassHeader
+import com.example.ui.theme.LightPinIcon
+import com.example.ui.theme.LightPrimary
+import com.example.ui.theme.LightSurface
+import com.example.ui.theme.LightTextMuted
+import com.example.ui.theme.LightTextPrimary
+import com.example.ui.theme.LightTextSecondary
+import com.example.ui.theme.LightTypingCyan
+import com.example.ui.theme.LightUnreadBadge
+import com.example.ui.theme.LightUnreadBadgeText
 import com.example.ui.theme.TelegramAccent
 import com.example.ui.theme.TelegramChatListBg
 import com.example.ui.theme.TelegramCheckBlue
@@ -101,27 +98,23 @@ fun ChatListScreen(
     selectedBottomNavIndex: Int,
     isSearching: Boolean,
     searchQuery: String,
+    isDarkMode: Boolean = true,
+    isRefreshing: Boolean = false,
+    currentUserName: String? = null,
+    currentUserPhone: String? = null,
+    currentUserAvatar: String? = null,
     onSearchToggle: (Boolean) -> Unit,
     onSearchQueryChange: (String) -> Unit,
     onCategoryTabSelect: (String) -> Unit,
     onBottomNavSelect: (Int) -> Unit,
     onChatClick: (ChatItem) -> Unit,
     onNewChatClick: () -> Unit,
-    isRefreshing: Boolean = false,
-    onRefresh: () -> Unit = {},
-    currentUserName: String? = null,
-    currentUserPhone: String? = null,
-    currentUserAvatar: String? = null,
-    onLogout: () -> Unit = {},
+    onToggleTheme: () -> Unit = {},
+    onOpenSavedMessages: () -> Unit = {},
+    onNewGroup: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
-    var showProfileDialog by remember { mutableStateOf(false) }
-
-    // If user selects profile tab in bottom nav, open profile dialog
-    if (selectedBottomNavIndex == 3) {
-        showProfileDialog = true
-    }
 
     val filteredChats = remember(chats, searchQuery) {
         if (searchQuery.isBlank()) chats
@@ -133,109 +126,35 @@ fun ChatListScreen(
 
     val listState = rememberLazyListState()
 
-    // Smooth subtle pulsing animation for "Updating..." text
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val updateAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.6f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(900),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "update_pulse"
-    )
-
-    // Profile Dialog
-    if (showProfileDialog) {
-        AlertDialog(
-            onDismissRequest = {
-                showProfileDialog = false
-                if (selectedBottomNavIndex == 3) onBottomNavSelect(0)
-            },
-            title = {
-                Text(
-                    text = "Account & Profile",
-                    color = TelegramTextPrimary,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
-                ) {
-                    AvatarView(
-                        avatarUrl = currentUserAvatar,
-                        title = currentUserName ?: "Telegram User",
-                        size = 72.dp
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = currentUserName ?: "7eve9chat User",
-                        color = TelegramTextPrimary,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    if (!currentUserPhone.isNullOrBlank()) {
-                        Text(
-                            text = "+$currentUserPhone",
-                            color = TelegramTextSecondary,
-                            fontSize = 14.sp,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Connected Server: https://7eve9craft.ir",
-                        color = TelegramPrimary,
-                        fontSize = 12.sp
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showProfileDialog = false
-                        onLogout()
-                    }
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ExitToApp,
-                        contentDescription = null,
-                        tint = Color(0xFFFF5252),
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Log Out / خروج", color = Color(0xFFFF5252), fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        showProfileDialog = false
-                        if (selectedBottomNavIndex == 3) onBottomNavSelect(0)
-                    }
-                ) {
-                    Text("Close", color = TelegramPrimary)
-                }
-            },
-            containerColor = TelegramDarkBg
-        )
-    }
+    // Pick palette based on theme
+    val bgColor = if (isDarkMode) TelegramChatListBg else LightChatListBg
+    val headerBg = if (isDarkMode) com.example.ui.theme.TelegramGlassHeader else LightGlassHeader
+    val headerBorder = if (isDarkMode) com.example.ui.theme.TelegramGlassBorder else LightGlassBorder
+    val textPrimary = if (isDarkMode) TelegramTextPrimary else LightTextPrimary
+    val textSecondary = if (isDarkMode) TelegramTextSecondary else LightTextSecondary
+    val textMuted = if (isDarkMode) TelegramTextMuted else LightTextMuted
+    val primaryColor = if (isDarkMode) TelegramPrimary else LightPrimary
+    val accentColor = if (isDarkMode) TelegramAccent else LightAccent
+    val badgeColor = if (isDarkMode) TelegramUnreadBadge else LightUnreadBadge
+    val badgeTextColor = if (isDarkMode) TelegramUnreadBadgeText else LightUnreadBadgeText
+    val pinColor = if (isDarkMode) TelegramPinIcon else LightPinIcon
+    val checkBlue = if (isDarkMode) TelegramCheckBlue else LightCheckBlue
+    val typingCyan = if (isDarkMode) TelegramTypingCyan else LightTypingCyan
+    val indicatorColor = if (isDarkMode) Color(0xFF1E2D3D) else Color(0xFFD6E9F7)
+    val menuBg = if (isDarkMode) TelegramDarkBg else LightSurface
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(TelegramChatListBg)
+            .background(bgColor)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             // Top App Bar
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(com.example.ui.theme.TelegramGlassHeader)
-                    .border(0.8.dp, com.example.ui.theme.TelegramGlassBorder)
+                    .background(headerBg)
+                    .border(0.8.dp, headerBorder)
                     .statusBarsPadding()
                     .padding(horizontal = 14.dp, vertical = 10.dp)
             ) {
@@ -247,15 +166,15 @@ fun ChatListScreen(
                         TextField(
                             value = searchQuery,
                             onValueChange = onSearchQueryChange,
-                            placeholder = { Text("Search chats...", color = TelegramTextMuted) },
+                            placeholder = { Text("Search chats...", color = textMuted) },
                             singleLine = true,
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor = Color.Transparent,
                                 unfocusedContainerColor = Color.Transparent,
                                 focusedIndicatorColor = Color.Transparent,
                                 unfocusedIndicatorColor = Color.Transparent,
-                                focusedTextColor = TelegramTextPrimary,
-                                unfocusedTextColor = TelegramTextPrimary
+                                focusedTextColor = textPrimary,
+                                unfocusedTextColor = textPrimary
                             ),
                             modifier = Modifier.weight(1f)
                         )
@@ -263,7 +182,7 @@ fun ChatListScreen(
                             Icon(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = "Close search",
-                                tint = Color.White
+                                tint = textPrimary
                             )
                         }
                     }
@@ -272,62 +191,13 @@ fun ChatListScreen(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Left lightning badge or Avatar
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFFF9A825))
-                                .clickable { showProfileDialog = true },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (!currentUserAvatar.isNullOrBlank()) {
-                                AvatarView(
-                                    avatarUrl = currentUserAvatar,
-                                    title = currentUserName,
-                                    size = 36.dp
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Default.FlashOn,
-                                    contentDescription = "Turbo / Proxy",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.width(14.dp))
-
-                        // Title
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable { onRefresh() }
-                        ) {
+                        // Title — just "connected" in place of the username
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = if (isRefreshing) "Updating..." else (currentUserName ?: "7eve9chat"),
-                                color = TelegramTextPrimary,
+                                text = if (isRefreshing) "Updating..." else "connected",
+                                color = textPrimary,
                                 fontSize = 19.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = if (isRefreshing) Modifier.alpha(updateAlpha) else Modifier
-                            )
-                            if (!isRefreshing) {
-                                Text(
-                                    text = "connected",
-                                    color = TelegramPrimary,
-                                    fontSize = 11.sp
-                                )
-                            }
-                        }
-
-                        // Refresh Action Icon
-                        IconButton(onClick = onRefresh) {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = "Refresh",
-                                tint = if (isRefreshing) TelegramPrimary else TelegramTextSecondary,
-                                modifier = Modifier.size(23.dp)
+                                fontWeight = FontWeight.SemiBold
                             )
                         }
 
@@ -336,45 +206,50 @@ fun ChatListScreen(
                             Icon(
                                 imageVector = Icons.Default.Search,
                                 contentDescription = "Search",
-                                tint = TelegramTextSecondary,
+                                tint = textSecondary,
                                 modifier = Modifier.size(23.dp)
                             )
                         }
 
-                        // Overflow menu
+                        // Overflow menu — 3-dot
                         Box {
                             IconButton(onClick = { showMenu = true }) {
                                 Icon(
                                     imageVector = Icons.Default.MoreVert,
                                     contentDescription = "Menu",
-                                    tint = TelegramTextSecondary,
+                                    tint = textSecondary,
                                     modifier = Modifier.size(23.dp)
                                 )
                             }
                             DropdownMenu(
                                 expanded = showMenu,
                                 onDismissRequest = { showMenu = false },
-                                modifier = Modifier.background(TelegramDarkBg)
+                                modifier = Modifier.background(menuBg)
                             ) {
                                 DropdownMenuItem(
-                                    text = { Text("Profile", color = TelegramTextPrimary) },
+                                    text = {
+                                        Text(
+                                            text = if (isDarkMode) "Light Mode" else "Dark Mode",
+                                            color = textPrimary
+                                        )
+                                    },
                                     onClick = {
                                         showMenu = false
-                                        showProfileDialog = true
+                                        onToggleTheme()
                                     }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("Refresh Chats", color = TelegramTextPrimary) },
+                                    text = { Text("New Group", color = textPrimary) },
                                     onClick = {
                                         showMenu = false
-                                        onRefresh()
+                                        onNewGroup()
                                     }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("Log Out", color = Color(0xFFFF5252)) },
+                                    text = { Text("Saved Messages", color = textPrimary) },
                                     onClick = {
                                         showMenu = false
-                                        onLogout()
+                                        onOpenSavedMessages()
                                     }
                                 )
                             }
@@ -387,7 +262,7 @@ fun ChatListScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(com.example.ui.theme.TelegramGlassHeader)
+                    .background(headerBg)
                     .horizontalScroll(rememberScrollState())
                     .padding(horizontal = 12.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -397,6 +272,7 @@ fun ChatListScreen(
                     title = "All Chats",
                     badge = "336",
                     isSelected = selectedCategoryTab == "All Chats",
+                    isDarkMode = isDarkMode,
                     onClick = { onCategoryTabSelect("All Chats") }
                 )
 
@@ -405,6 +281,7 @@ fun ChatListScreen(
                     title = "Personal",
                     badge = null,
                     isSelected = selectedCategoryTab == "Personal",
+                    isDarkMode = isDarkMode,
                     onClick = { onCategoryTabSelect("Personal") }
                 )
 
@@ -413,6 +290,7 @@ fun ChatListScreen(
                     title = "Channels",
                     badge = "42",
                     isSelected = selectedCategoryTab == "Channels",
+                    isDarkMode = isDarkMode,
                     onClick = { onCategoryTabSelect("Channels") }
                 )
 
@@ -421,6 +299,7 @@ fun ChatListScreen(
                     title = "Groups",
                     badge = "12",
                     isSelected = selectedCategoryTab == "Groups",
+                    isDarkMode = isDarkMode,
                     onClick = { onCategoryTabSelect("Groups") }
                 )
             }
@@ -435,6 +314,7 @@ fun ChatListScreen(
                 items(filteredChats, key = { it.id }) { chat ->
                     ChatListItem(
                         chat = chat,
+                        isDarkMode = isDarkMode,
                         onClick = { onChatClick(chat) }
                     )
                 }
@@ -442,11 +322,11 @@ fun ChatListScreen(
 
             // Bottom Navigation Bar
             NavigationBar(
-                containerColor = com.example.ui.theme.TelegramGlassHeader,
+                containerColor = headerBg,
                 tonalElevation = 0.dp,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(0.8.dp, com.example.ui.theme.TelegramGlassBorder)
+                    .border(0.8.dp, headerBorder)
                     .navigationBarsPadding()
             ) {
                 NavigationBarItem(
@@ -459,29 +339,32 @@ fun ChatListScreen(
                                 contentDescription = "Chats",
                                 modifier = Modifier.size(24.dp)
                             )
-                            // Badge 333 on Chats
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .background(TelegramPrimary, RoundedCornerShape(10.dp))
-                                    .padding(horizontal = 4.dp, vertical = 1.dp)
-                            ) {
-                                Text(
-                                    text = "333",
-                                    color = Color.White,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
+                            // Real unread badge = total of all chat unread counts
+                            val totalUnread = chats.sumOf { it.unreadCount }
+                            if (totalUnread > 0) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .background(badgeColor, RoundedCornerShape(10.dp))
+                                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                                ) {
+                                    Text(
+                                        text = if (totalUnread > 999) "999+" else totalUnread.toString(),
+                                        color = badgeTextColor,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
                         }
                     },
                     label = { Text("Chats", fontSize = 11.sp) },
                     colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = TelegramPrimary,
-                        selectedTextColor = TelegramPrimary,
-                        indicatorColor = Color(0xFF1E2D3D),
-                        unselectedIconColor = TelegramTextSecondary,
-                        unselectedTextColor = TelegramTextSecondary
+                        selectedIconColor = primaryColor,
+                        selectedTextColor = primaryColor,
+                        indicatorColor = indicatorColor,
+                        unselectedIconColor = textSecondary,
+                        unselectedTextColor = textSecondary
                     )
                 )
 
@@ -497,11 +380,11 @@ fun ChatListScreen(
                     },
                     label = { Text("Contacts", fontSize = 11.sp) },
                     colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = TelegramPrimary,
-                        selectedTextColor = TelegramPrimary,
-                        indicatorColor = Color(0xFF1E2D3D),
-                        unselectedIconColor = TelegramTextSecondary,
-                        unselectedTextColor = TelegramTextSecondary
+                        selectedIconColor = primaryColor,
+                        selectedTextColor = primaryColor,
+                        indicatorColor = indicatorColor,
+                        unselectedIconColor = textSecondary,
+                        unselectedTextColor = textSecondary
                     )
                 )
 
@@ -517,11 +400,11 @@ fun ChatListScreen(
                     },
                     label = { Text("Settings", fontSize = 11.sp) },
                     colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = TelegramPrimary,
-                        selectedTextColor = TelegramPrimary,
-                        indicatorColor = Color(0xFF1E2D3D),
-                        unselectedIconColor = TelegramTextSecondary,
-                        unselectedTextColor = TelegramTextSecondary
+                        selectedIconColor = primaryColor,
+                        selectedTextColor = primaryColor,
+                        indicatorColor = indicatorColor,
+                        unselectedIconColor = textSecondary,
+                        unselectedTextColor = textSecondary
                     )
                 )
 
@@ -530,17 +413,18 @@ fun ChatListScreen(
                     onClick = { onBottomNavSelect(3) },
                     icon = {
                         AvatarView(
-                            avatarType = AvatarType.MOTORCYCLE,
+                            avatarUrl = currentUserAvatar,
+                            title = currentUserName,
                             size = 26.dp
                         )
                     },
                     label = { Text("Profile", fontSize = 11.sp) },
                     colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = TelegramPrimary,
-                        selectedTextColor = TelegramPrimary,
-                        indicatorColor = Color(0xFF1E2D3D),
-                        unselectedIconColor = TelegramTextSecondary,
-                        unselectedTextColor = TelegramTextSecondary
+                        selectedIconColor = primaryColor,
+                        selectedTextColor = primaryColor,
+                        indicatorColor = indicatorColor,
+                        unselectedIconColor = textSecondary,
+                        unselectedTextColor = textSecondary
                     )
                 )
             }
@@ -574,6 +458,7 @@ private fun CategoryPillTab(
     title: String,
     badge: String?,
     isSelected: Boolean,
+    isDarkMode: Boolean = true,
     onClick: () -> Unit
 ) {
     val pillShape = RoundedCornerShape(20.dp)
@@ -582,12 +467,19 @@ private fun CategoryPillTab(
             listOf(Color(0xFF2B5C87), Color(0xFF1D4262))
         )
     } else {
-        androidx.compose.ui.graphics.Brush.horizontalGradient(
-            listOf(Color(0xA6182534), Color(0x80121C26))
-        )
+        if (isDarkMode) {
+            androidx.compose.ui.graphics.Brush.horizontalGradient(
+                listOf(Color(0xA6182534), Color(0x80121C26))
+            )
+        } else {
+            androidx.compose.ui.graphics.Brush.horizontalGradient(
+                listOf(Color(0x0D000000), Color(0x08000000))
+            )
+        }
     }
-    val borderStroke = if (isSelected) Color(0x6652B8FF) else Color(0x24FFFFFF)
-    val textColor = if (isSelected) Color.White else TelegramTextSecondary
+    val borderStroke = if (isSelected) Color(0x6652B8FF) else if (isDarkMode) Color(0x24FFFFFF) else Color(0x14000000)
+    val textColor = if (isSelected) Color.White else if (isDarkMode) TelegramTextSecondary else LightTextSecondary
+    val badgeBg = if (isSelected) (if (isDarkMode) TelegramPrimary else LightPrimary) else if (isDarkMode) Color(0xFF293749) else Color(0xFFD6DEE5)
 
     Row(
         modifier = Modifier
@@ -611,7 +503,7 @@ private fun CategoryPillTab(
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(10.dp))
-                    .background(if (isSelected) TelegramPrimary else Color(0xFF293749))
+                    .background(badgeBg)
                     .padding(horizontal = 6.dp, vertical = 1.dp)
             ) {
                 Text(
@@ -628,8 +520,20 @@ private fun CategoryPillTab(
 @Composable
 private fun ChatListItem(
     chat: ChatItem,
+    isDarkMode: Boolean = true,
     onClick: () -> Unit
 ) {
+    val textPrimary = if (isDarkMode) TelegramTextPrimary else LightTextPrimary
+    val textSecondary = if (isDarkMode) TelegramTextSecondary else LightTextSecondary
+    val textMuted = if (isDarkMode) TelegramTextMuted else LightTextMuted
+    val checkBlue = if (isDarkMode) TelegramCheckBlue else LightCheckBlue
+    val typingCyan = if (isDarkMode) TelegramTypingCyan else LightTypingCyan
+    val pinColor = if (isDarkMode) TelegramPinIcon else LightPinIcon
+    val badgeColor = if (isDarkMode) TelegramUnreadBadge else LightUnreadBadge
+    val badgeTextColor = if (isDarkMode) TelegramUnreadBadgeText else LightUnreadBadgeText
+    val accentColor = if (isDarkMode) TelegramAccent else LightAccent
+    val mentionBg = if (isDarkMode) Color(0xFF26384C) else Color(0xFFD6E9F7)
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -661,7 +565,7 @@ private fun ChatListItem(
             ) {
                 Text(
                     text = chat.title,
-                    color = TelegramTextPrimary,
+                    color = textPrimary,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -674,7 +578,7 @@ private fun ChatListItem(
                     Icon(
                         imageVector = Icons.Default.VolumeOff,
                         contentDescription = "Muted",
-                        tint = TelegramTextMuted,
+                        tint = textMuted,
                         modifier = Modifier.size(14.dp)
                     )
                 }
@@ -687,7 +591,7 @@ private fun ChatListItem(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "••• ${chat.typingUser ?: "User"} is typing",
-                        color = TelegramTypingCyan,
+                        color = typingCyan,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,
@@ -700,7 +604,7 @@ private fun ChatListItem(
                         Icon(
                             imageVector = Icons.Default.DoneAll,
                             contentDescription = "Read",
-                            tint = TelegramCheckBlue,
+                            tint = checkBlue,
                             modifier = Modifier
                                 .size(16.dp)
                                 .padding(end = 3.dp)
@@ -709,7 +613,7 @@ private fun ChatListItem(
                         Icon(
                             imageVector = Icons.Default.Done,
                             contentDescription = "Sent",
-                            tint = TelegramCheckBlue,
+                            tint = checkBlue,
                             modifier = Modifier
                                 .size(14.dp)
                                 .padding(end = 3.dp)
@@ -718,7 +622,7 @@ private fun ChatListItem(
 
                     Text(
                         text = chat.subtitle,
-                        color = TelegramTextSecondary,
+                        color = textSecondary,
                         fontSize = 14.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -734,7 +638,7 @@ private fun ChatListItem(
         ) {
             Text(
                 text = chat.time,
-                color = TelegramTextSecondary,
+                color = textSecondary,
                 fontSize = 12.sp
             )
 
@@ -748,7 +652,7 @@ private fun ChatListItem(
                     Icon(
                         imageVector = Icons.Default.PushPin,
                         contentDescription = "Pinned",
-                        tint = TelegramPinIcon,
+                        tint = pinColor,
                         modifier = Modifier.size(15.dp)
                     )
                 }
@@ -757,12 +661,12 @@ private fun ChatListItem(
                     Box(
                         modifier = Modifier
                             .clip(CircleShape)
-                            .background(Color(0xFF26384C))
+                            .background(mentionBg)
                             .padding(horizontal = 4.dp, vertical = 2.dp)
                     ) {
                         Text(
                             text = "@",
-                            color = TelegramAccent,
+                            color = accentColor,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -773,12 +677,12 @@ private fun ChatListItem(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
-                            .background(TelegramUnreadBadge)
+                            .background(badgeColor)
                             .padding(horizontal = 7.dp, vertical = 2.dp)
                     ) {
                         Text(
                             text = if (chat.unreadCount > 9999) "${chat.unreadCount}" else "${chat.unreadCount}",
-                            color = TelegramUnreadBadgeText,
+                            color = badgeTextColor,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
