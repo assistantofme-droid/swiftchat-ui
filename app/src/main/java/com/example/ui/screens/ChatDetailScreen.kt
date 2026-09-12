@@ -1,6 +1,8 @@
 package com.example.ui.screens
 
 import com.example.ui.theme.appPalette
+import com.example.ui.theme.TelegramGlassInput
+import com.example.ui.theme.TelegramSendFabGradient
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
