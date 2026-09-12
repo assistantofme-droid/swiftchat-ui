@@ -129,7 +129,12 @@ data class AppStrings(
     val enterCode: String,
     val sendCode: String,
     val confirmSignIn: String,
-    val resendCode: String
+    val resendCode: String,
+    // Nav labels
+    val navChats: String,
+    val navContacts: String,
+    val navSettings: String,
+    val navProfile: String
 )
 
 val EnglishStrings = AppStrings(
@@ -241,7 +246,11 @@ val EnglishStrings = AppStrings(
     enterCode = "Enter Code",
     sendCode = "Send Code",
     confirmSignIn = "Confirm & Sign In",
-    resendCode = "Resend code"
+    resendCode = "Resend code",
+    navChats = "Chats",
+    navContacts = "Contacts",
+    navSettings = "Settings",
+    navProfile = "Profile"
 )
 
 val PersianStrings = AppStrings(
@@ -353,7 +362,11 @@ val PersianStrings = AppStrings(
     enterCode = "کد را وارد کنید",
     sendCode = "ارسال کد",
     confirmSignIn = "تأیید و ورود",
-    resendCode = "ارسال مجدد کد"
+    resendCode = "ارسال مجدد کد",
+    navChats = "چت‌ها",
+    navContacts = "مخاطبین",
+    navSettings = "تنظیمات",
+    navProfile = "پروفایل"
 )
 
 fun stringsForLanguage(lang: String): AppStrings = when (lang) {
