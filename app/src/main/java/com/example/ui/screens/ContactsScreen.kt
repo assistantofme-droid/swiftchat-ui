@@ -142,101 +142,105 @@ fun ContactsScreen(
         }
     }
 
-    Scaffold(
-        containerColor = appPalette.chatListBg,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = { ContactsHeader() },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddDialog = true },
-                containerColor = appPalette.primary,
-                contentColor = Color.White,
-                shape = CircleShape,
-                modifier = Modifier.padding(bottom = 72.dp)
-            ) {
-                Icon(Icons.Default.PersonAdd, contentDescription = "Add contact")
-            }
-        }
-    ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                SearchBar(query = query, onQueryChange = { query = it })
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(appPalette.chatListBg)
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            ContactsHeader()
+            SearchBar(query = query, onQueryChange = { query = it })
 
-                // === New Group / New Channel buttons ===
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    ActionChip(
-                        modifier = Modifier.weight(1f),
-                        icon = Icons.Default.Group,
-                        label = "New Group",
-                        onClick = { showCreateGroupDialog = true }
-                    )
-                    ActionChip(
-                        modifier = Modifier.weight(1f),
-                        icon = Icons.Default.Campaign,
-                        label = "New Channel",
-                        onClick = { showCreateChannelDialog = true }
-                    )
-                }
-
-                when {
-                    !hasContactsPermission -> {
-                        PermissionPrompt(
-                            onAllow = { contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS) }
-                        )
-                    }
-                    isLoading -> {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator(color = appPalette.primary)
-                        }
-                    }
-                    errorMessage != null && contacts.isEmpty() -> {
-                        ErrorState(
-                            message = errorMessage,
-                            onRetry = { onLaunchLoad() }
-                        )
-                    }
-                    filtered.isEmpty() && contacts.isNotEmpty() -> {
-                        EmptyState(message = "No contacts match \"$query\"")
-                    }
-                    filtered.isEmpty() -> {
-                        EmptyState(
-                            message = "None of your device contacts are on 7eve9Chat yet. " +
-                                "Tap + to invite someone by username or phone."
-                        )
-                    }
-                    else -> {
-                        LazyColumn(modifier = Modifier.fillMaxSize()) {
-                            items(filtered, key = { it._id ?: it.username ?: it.phone ?: it.name ?: "" }) { contact ->
-                                ContactRow(contact = contact, onClick = { onContactClick(contact) })
-                            }
-                            item { Spacer(modifier = Modifier.height(100.dp)) }
-                        }
-                    }
-                }
-            }
-
-            // Floating glass bottom nav overlay
-            TelegramBottomNav(
-                selectedIndex = selectedBottomNavIndex,
-                onSelect = onSelectBottomNav,
-                currentUserAvatarUrl = currentUserAvatarUrl,
+            // === New Group / New Channel buttons ===
+            Row(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
-            )
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ActionChip(
+                    modifier = Modifier.weight(1f),
+                    icon = Icons.Default.Group,
+                    label = "New Group",
+                    onClick = { showCreateGroupDialog = true }
+                )
+                ActionChip(
+                    modifier = Modifier.weight(1f),
+                    icon = Icons.Default.Campaign,
+                    label = "New Channel",
+                    onClick = { showCreateChannelDialog = true }
+                )
+            }
+
+            when {
+                !hasContactsPermission -> {
+                    PermissionPrompt(
+                        onAllow = { contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS) }
+                    )
+                }
+                isLoading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = appPalette.primary)
+                    }
+                }
+                errorMessage != null && contacts.isEmpty() -> {
+                    ErrorState(
+                        message = errorMessage,
+                        onRetry = { onLaunchLoad() }
+                    )
+                }
+                filtered.isEmpty() && contacts.isNotEmpty() -> {
+                    EmptyState(message = "No contacts match \"$query\"")
+                }
+                filtered.isEmpty() -> {
+                    EmptyState(
+                        message = "None of your device contacts are on 7eve9Chat yet. " +
+                            "Tap + to invite someone by username or phone."
+                    )
+                }
+                else -> {
+                    LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        items(filtered, key = { it._id ?: it.username ?: it.phone ?: it.name ?: "" }) { contact ->
+                            ContactRow(contact = contact, onClick = { onContactClick(contact) })
+                        }
+                        item { Spacer(modifier = Modifier.height(100.dp)) }
+                    }
+                }
+            }
         }
+
+        // FAB
+        FloatingActionButton(
+            onClick = { showAddDialog = true },
+            containerColor = appPalette.primary,
+            contentColor = Color.White,
+            shape = CircleShape,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(bottom = 80.dp, end = 16.dp)
+        ) {
+            Icon(Icons.Default.PersonAdd, contentDescription = "Add contact")
+        }
+
+        // Floating glass bottom nav overlay — at Box level so it's flush
+        // with the screen bottom, same as ChatListScreen
+        TelegramBottomNav(
+            selectedIndex = selectedBottomNavIndex,
+            onSelect = onSelectBottomNav,
+            currentUserAvatarUrl = currentUserAvatarUrl,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+        )
+
+        // Snackbar host at bottom
+        SnackbarHost(
+            snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 
     if (showAddDialog) {

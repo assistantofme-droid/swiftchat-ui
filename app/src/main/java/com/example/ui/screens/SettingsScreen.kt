@@ -66,9 +66,13 @@ fun SettingsScreen(
     onOpenRoute: (String) -> Unit,
     onAskQuestion: () -> Unit
 ) {
-    Scaffold(
-        containerColor = appPalette.chatListBg,
-        topBar = {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(appPalette.chatListBg)
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Top bar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -91,13 +95,7 @@ fun SettingsScreen(
                     Icon(Icons.Default.MoreVert, contentDescription = "More", tint = appPalette.textSecondary)
                 }
             }
-        },
-    ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
+
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 12.dp)
@@ -205,17 +203,17 @@ fun SettingsScreen(
 
             item { Spacer(modifier = Modifier.height(100.dp)) }
             }
-
-            // Floating glass bottom nav overlay
-            TelegramBottomNav(
-                selectedIndex = selectedBottomNavIndex,
-                onSelect = onSelectBottomNav,
-                currentUserAvatarUrl = currentUserAvatarUrl,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
-            )
         }
+
+        // Floating glass bottom nav overlay — at Box level, flush with screen bottom
+        TelegramBottomNav(
+            selectedIndex = selectedBottomNavIndex,
+            onSelect = onSelectBottomNav,
+            currentUserAvatarUrl = currentUserAvatarUrl,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+        )
     }
 }
 
