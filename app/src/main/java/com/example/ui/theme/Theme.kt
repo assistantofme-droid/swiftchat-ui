@@ -21,6 +21,18 @@ val TelegramCheckBlue = Color(0xFF40B7FE)
 val TelegramBubbleDatePill = Color(0x66000000)
 val TelegramGlassBorder = Color(0x26FFFFFF)
 val TelegramGlassHighlight = Color(0x1AFFFFFF)
+// Additional colors used by old components
+val TelegramGlassInput = Color(0xDE182430)
+val TelegramChatListBg = Color(0xFF0F172A)
+val TelegramSurface = Color(0xFF1E293B)
+val TelegramSurfaceVariant = Color(0xFF334155)
+val TelegramUnreadBadge = Color(0xFF4A84BA)
+val TelegramPinIcon = Color(0xFF6C7A89)
+val TelegramTypingCyan = Color(0xFF52B8FF)
+val TelegramIncomingBubble = Color(0xFF1E2C3A)
+val TelegramOutgoingBubble = Color(0xFF2B5278)
+val TelegramSheetItemBg = Color(0xFF202C3A)
+val TelegramSheetBorder = Color(0x2EFFFFFF)
 val TelegramAccent = Color(0xFF38BDF8)
 
 val TelegramIncomingGradient = Brush.verticalGradient(
