@@ -25,41 +25,23 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          accept-android-sdk-licenses: true
-
       - name: Install Android SDK packages
         run: |
           set -e
-          # Find the sdkmanager binary — the runner image may have it at
-          # cmdline-tools/latest or cmdline-tools/16.0. Try both.
-          SDKMGR=""
-          for path in \
-            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
-            "$ANDROID_HOME/cmdline-tools/16.0/bin/sdkmanager" \
-            "$ANDROID_HOME/cmdline-tools/bin/sdkmanager"; do
-            if [ -x "$path" ]; then
-              SDKMGR="$path"
-              break
-            fi
-          done
-          if [ -z "$SDKMGR" ]; then
-            echo "sdkmanager not found, trying to fix cmdline-tools..."
-            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
-            SDKMGR="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          # The runner already has Android SDK pre-installed. We just need
+          # to make sure the right platforms and build-tools are present.
+          # Skip the buggy setup-android action — call sdkmanager directly.
+          SDKMGR="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMGR" ]; then
+            SDKMGR="$ANDROID_HOME/cmdline-tools/16.0/bin/sdkmanager"
           fi
-          echo "Using sdkmanager: $SDKMGR"
+          echo "Using: $SDKMGR"
           yes | "$SDKMGR" --licenses > /dev/null 2>&1 || true
           "$SDKMGR" --install \
             "platforms;android-36" \
             "platforms;android-35" \
             "build-tools;36.0.0" \
-            "build-tools;35.0.0" || true
-          echo "Installed SDK packages:"
-          "$SDKMGR" --list_installed 2>/dev/null || \
-          "$SDKMGR" --list 2>/dev/null | head -50 || true
+            "build-tools;35.0.0" 2>/dev/null || true
 
       - name: Cache Gradle
         uses: actions/cache@v4
