@@ -22,7 +22,9 @@ data class AudioPlaybackState(
     val isPlaying: Boolean = false,
     val progress: Float = 0f,
     val currentPositionMs: Long = 0L,
-    val durationMs: Long = 0L
+    val durationMs: Long = 0L,
+    val senderName: String? = null,
+    val speed: Float = 1.0f
 )
 
 object AudioPlayerManager {
@@ -110,6 +112,21 @@ object AudioPlayerManager {
     }
 
     fun seekTo(seekRatio: Float) {
+
+    fun toggleSpeed(context: Context) {
+        // Toggle between 1x and 2x speed
+        val newSpeed = if (_playbackState.value.speed > 1.0f) 1.0f else 2.0f
+        _playbackState.update { it.copy(speed = newSpeed) }
+        try {
+            mediaPlayer?.let {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    it.playbackParams = it.playbackParams.setSpeed(newSpeed)
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "toggleSpeed: ${e.message}")
+        }
+    }
         val player = mediaPlayer ?: return
         val duration = _playbackState.value.durationMs
         if (duration > 0) {
