@@ -131,7 +131,7 @@ fun TelegramVoiceTopBanner(
                             .clip(RoundedCornerShape(12.dp))
                             .background(if (audioState.speed > 1.0f) TelegramPrimary else Color(0x33FFFFFF))
                             .border(0.8.dp, if (audioState.speed > 1.0f) TelegramPrimary else Color(0x44FFFFFF), RoundedCornerShape(12.dp))
-                            .clickable { AudioPlayerManager.toggleSpeed(null as? Context) }
+                            .clickable { AudioPlayerManager.toggleSpeed() }
                             .padding(horizontal = 8.dp, vertical = 3.dp)
                     ) {
                         Text(

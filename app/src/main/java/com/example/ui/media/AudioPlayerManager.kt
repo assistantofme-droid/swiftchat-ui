@@ -163,9 +163,6 @@ object AudioPlayerManager {
             }
         }
     }
-}
-
-
 
     fun toggleSpeed() {
         val newSpeed = if (_playbackState.value.speed > 1.0f) 1.0f else 2.0f
