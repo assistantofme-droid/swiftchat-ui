@@ -19,13 +19,13 @@ class MediaReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
             ACTION_PLAY_PAUSE -> {
-                AudioPlayerManager.togglePlayPause(context)
+                AudioPlayerManager.togglePlayPause()
             }
             ACTION_NEXT -> {
-                AudioPlayerManager.skipNext(context)
+                AudioPlayerManager.skipNext()
             }
             ACTION_PREVIOUS -> {
-                AudioPlayerManager.skipPrevious(context)
+                AudioPlayerManager.skipPrevious()
             }
             ACTION_STOP -> {
                 AudioPlayerManager.stop(context)

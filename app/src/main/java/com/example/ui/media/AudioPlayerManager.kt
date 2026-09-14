@@ -114,20 +114,6 @@ object AudioPlayerManager {
 
     fun seekTo(seekRatio: Float) {
 
-    fun toggleSpeed(context: Context) {
-        // Toggle between 1x and 2x speed
-        val newSpeed = if (_playbackState.value.speed > 1.0f) 1.0f else 2.0f
-        _playbackState.update { it.copy(speed = newSpeed) }
-        try {
-            mediaPlayer?.let {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    it.playbackParams = it.playbackParams.setSpeed(newSpeed)
-                }
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "toggleSpeed: ${e.message}")
-        }
-    }
         val player = mediaPlayer ?: return
         val duration = _playbackState.value.durationMs
         if (duration > 0) {
@@ -179,12 +165,27 @@ object AudioPlayerManager {
     }
 }
 
-    fun togglePlayPause(context: Context) {
+
+
+    fun toggleSpeed() {
+        val newSpeed = if (_playbackState.value.speed > 1.0f) 1.0f else 2.0f
+        _playbackState.update { it.copy(speed = newSpeed) }
+        try {
+            mediaPlayer?.let {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    it.playbackParams = it.playbackParams.setSpeed(newSpeed)
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "toggleSpeed: ${e.message}")
+        }
+    }
+
+    fun togglePlayPause() {
         if (_playbackState.value.isPlaying) {
             pause()
         } else {
-            _playbackState.value.activeMessageId?.let { id ->
-                // Resume playback
+            _playbackState.value.activeMessageId?.let {
                 mediaPlayer?.start()
                 _playbackState.update { it.copy(isPlaying = true) }
                 startProgressTracker()
@@ -192,10 +193,11 @@ object AudioPlayerManager {
         }
     }
 
-    fun skipNext(context: Context) {
+    fun skipNext() {
         // Placeholder — no queue/playlist yet
     }
 
-    fun skipPrevious(context: Context) {
+    fun skipPrevious() {
         // Placeholder — no queue/playlist yet
     }
+}
