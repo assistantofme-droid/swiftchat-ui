@@ -14,6 +14,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
@@ -178,22 +179,23 @@ object AudioPlayerManager {
     }
 }
 
-object MediaNotificationHelper {
-    private const val CHANNEL_ID = "telegram_media_playback"
-    private const val CHANNEL_NAME = "Media Playback"
-
-    fun createNotificationChannel(context: Context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Shows media playback controls"
-                setShowBadge(false)
+    fun togglePlayPause(context: Context) {
+        if (_playbackState.value.isPlaying) {
+            pause()
+        } else {
+            _playbackState.value.activeMessageId?.let { id ->
+                // Resume playback
+                mediaPlayer?.start()
+                _playbackState.update { it.copy(isPlaying = true) }
+                startProgressTracker()
             }
-            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-            manager?.createNotificationChannel(channel)
         }
     }
-}
+
+    fun skipNext(context: Context) {
+        // Placeholder — no queue/playlist yet
+    }
+
+    fun skipPrevious(context: Context) {
+        // Placeholder — no queue/playlist yet
+    }
