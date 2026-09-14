@@ -1,266 +1,182 @@
 package com.example.ui.media
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.MediaPlayer
-import android.os.Handler
-import android.os.Looper
+import android.os.Build
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 data class AudioPlaybackState(
     val activeMessageId: String? = null,
-    val senderName: String? = null,
     val isPlaying: Boolean = false,
-    val currentPositionMs: Int = 0,
-    val durationMs: Int = 0,
     val progress: Float = 0f,
-    val speed: Float = 1.0f
+    val currentPositionMs: Long = 0L,
+    val durationMs: Long = 0L
 )
 
 object AudioPlayerManager {
+    private const val TAG = "AudioPlayerManager"
     private var mediaPlayer: MediaPlayer? = null
-    private val handler = Handler(Looper.getMainLooper())
-    private var progressRunnable: Runnable? = null
-    private var lastContext: Context? = null
-    private var currentTitle: String = "Voice message"
+    private var progressJob: Job? = null
+    private val scope = CoroutineScope(Dispatchers.Main)
 
     private val _playbackState = MutableStateFlow(AudioPlaybackState())
     val playbackState: StateFlow<AudioPlaybackState> = _playbackState.asStateFlow()
 
-    fun toggleSpeed() {
-        val currentSpeed = _playbackState.value.speed
-        val newSpeed = if (currentSpeed == 1.0f) 2.0f else 1.0f
-        try {
-            mediaPlayer?.let {
-                it.playbackParams = it.playbackParams.setSpeed(newSpeed)
-            }
-        } catch (_: Exception) {}
-        _playbackState.value = _playbackState.value.copy(speed = newSpeed)
-    }
-
-    fun togglePlay(context: Context, messageId: String, audioUrl: String, durationSec: Int = 30, senderName: String? = null) {
-        lastContext = context.applicationContext
-        currentTitle = if (!senderName.isNullOrBlank()) "Voice note from $senderName" else "Voice Message"
+    fun togglePlay(context: Context, messageId: String, url: String, durationSec: Int) {
         val currentState = _playbackState.value
 
-        // If clicking the same message that is currently playing
-        if (currentState.activeMessageId == messageId) {
-            if (currentState.isPlaying) {
-                pause(context)
-            } else {
-                resume(context)
-            }
+        if (currentState.activeMessageId == messageId && currentState.isPlaying) {
+            pause()
             return
         }
 
-        // Switching to a new audio track or voice note
-        stop(context)
-        startPlaying(context, messageId, audioUrl, durationSec, senderName)
-    }
-
-    fun togglePlayPause(context: Context) {
-        val ctx = context.applicationContext
-        lastContext = ctx
-        if (_playbackState.value.isPlaying) {
-            pause(ctx)
-        } else {
-            resume(ctx)
+        if (currentState.activeMessageId == messageId && mediaPlayer != null) {
+            mediaPlayer?.start()
+            _playbackState.value = currentState.copy(isPlaying = true)
+            startProgressTracker()
+            return
         }
+
+        playNew(context, messageId, url, durationSec)
     }
 
-    fun skipNext(context: Context) {
-        val state = _playbackState.value
-        val totalMs = if (state.durationMs > 0) state.durationMs else 15000
-        val targetMs = (state.currentPositionMs + 10000).coerceAtMost(totalMs)
-        try {
-            mediaPlayer?.seekTo(targetMs)
-        } catch (_: Exception) {}
-        val ratio = (targetMs.toFloat() / totalMs.toFloat()).coerceIn(0f, 1f)
-        _playbackState.value = state.copy(currentPositionMs = targetMs, progress = ratio)
-        updateNotification(context)
-    }
+    private fun playNew(context: Context, messageId: String, url: String, durationSec: Int) {
+        releasePlayer()
 
-    fun skipPrevious(context: Context) {
-        val state = _playbackState.value
-        val totalMs = if (state.durationMs > 0) state.durationMs else 15000
-        val targetMs = (state.currentPositionMs - 10000).coerceAtLeast(0)
-        try {
-            mediaPlayer?.seekTo(targetMs)
-        } catch (_: Exception) {}
-        val ratio = (targetMs.toFloat() / totalMs.toFloat()).coerceIn(0f, 1f)
-        _playbackState.value = state.copy(currentPositionMs = targetMs, progress = ratio)
-        updateNotification(context)
-    }
+        _playbackState.value = AudioPlaybackState(
+            activeMessageId = messageId,
+            isPlaying = true,
+            progress = 0f,
+            currentPositionMs = 0L,
+            durationMs = (durationSec * 1000).toLong()
+        )
 
-    private fun startPlaying(context: Context, messageId: String, audioUrl: String, durationSec: Int, senderName: String? = null) {
-        lastContext = context.applicationContext
         try {
-            mediaPlayer = MediaPlayer().apply {
+            val player = MediaPlayer().apply {
                 setAudioAttributes(
                     AudioAttributes.Builder()
-                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                         .setUsage(AudioAttributes.USAGE_MEDIA)
                         .build()
                 )
-                setDataSource(audioUrl)
+                setDataSource(url)
                 setOnPreparedListener { mp ->
-                    try {
-                        val currentSpeed = _playbackState.value.speed
-                        mp.playbackParams = mp.playbackParams.setSpeed(currentSpeed)
-                    } catch (_: Exception) {}
                     mp.start()
-                    val dur = if (mp.duration > 0) mp.duration else durationSec * 1000
-                    _playbackState.value = AudioPlaybackState(
-                        activeMessageId = messageId,
-                        senderName = senderName,
+                    val realDuration = mp.duration.toLong().coerceAtLeast(1000L)
+                    _playbackState.value = _playbackState.value.copy(
                         isPlaying = true,
-                        currentPositionMs = 0,
-                        durationMs = dur,
-                        progress = 0f,
-                        speed = _playbackState.value.speed
+                        durationMs = realDuration
                     )
                     startProgressTracker()
-                    updateNotification(context)
                 }
                 setOnCompletionListener {
-                    stop(context)
+                    _playbackState.value = _playbackState.value.copy(
+                        isPlaying = false,
+                        progress = 0f,
+                        currentPositionMs = 0L
+                    )
+                    progressJob?.cancel()
                 }
                 setOnErrorListener { _, what, extra ->
-                    Log.w("AudioPlayerManager", "Playback error what=$what extra=$extra, simulating timer")
-                    simulatePlayback(context, messageId, durationSec, senderName)
+                    Log.e(TAG, "MediaPlayer error: what=$what, extra=$extra")
+                    _playbackState.value = AudioPlaybackState()
                     true
                 }
                 prepareAsync()
             }
+            mediaPlayer = player
         } catch (e: Exception) {
-            Log.e("AudioPlayerManager", "Failed to start player", e)
-            simulatePlayback(context, messageId, durationSec, senderName)
+            Log.e(TAG, "Failed to start audio playback", e)
+            _playbackState.value = AudioPlaybackState()
         }
     }
 
-    private fun simulatePlayback(context: Context, messageId: String, durationSec: Int, senderName: String? = null) {
-        val durMs = if (durationSec > 0) durationSec * 1000 else 15000
-        _playbackState.value = AudioPlaybackState(
-            activeMessageId = messageId,
-            senderName = senderName,
-            isPlaying = true,
-            currentPositionMs = 0,
-            durationMs = durMs,
-            progress = 0f,
-            speed = _playbackState.value.speed
-        )
-        startProgressTracker()
-        updateNotification(context)
-    }
-
-    fun resume(context: Context? = lastContext) {
-        mediaPlayer?.let {
-            if (!it.isPlaying) {
-                it.start()
-                _playbackState.value = _playbackState.value.copy(isPlaying = true)
-                startProgressTracker()
-            }
-        } ?: run {
-            _playbackState.value = _playbackState.value.copy(isPlaying = true)
-            startProgressTracker()
-        }
-        context?.let { updateNotification(it) }
-    }
-
-    fun pause(context: Context? = lastContext) {
-        mediaPlayer?.let {
-            if (it.isPlaying) {
-                it.pause()
-            }
-        }
-        stopProgressTracker()
+    private fun pause() {
+        mediaPlayer?.pause()
+        progressJob?.cancel()
         _playbackState.value = _playbackState.value.copy(isPlaying = false)
-        context?.let { updateNotification(it) }
     }
 
-    fun stop(context: Context? = lastContext) {
-        stopProgressTracker()
+    fun seekTo(seekRatio: Float) {
+        val player = mediaPlayer ?: return
+        val duration = _playbackState.value.durationMs
+        if (duration > 0) {
+            val targetMs = (duration * seekRatio.coerceIn(0f, 1f)).toInt()
+            try {
+                player.seekTo(targetMs)
+                _playbackState.value = _playbackState.value.copy(
+                    progress = seekRatio.coerceIn(0f, 1f),
+                    currentPositionMs = targetMs.toLong()
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to seek", e)
+            }
+        }
+    }
+
+    fun stop(context: Context? = null) {
+        releasePlayer()
+        _playbackState.value = AudioPlaybackState()
+    }
+
+    private fun releasePlayer() {
+        progressJob?.cancel()
+        progressJob = null
         try {
             mediaPlayer?.stop()
             mediaPlayer?.release()
         } catch (_: Exception) {}
         mediaPlayer = null
-        _playbackState.value = AudioPlaybackState()
-        context?.let {
-            MediaNotificationHelper.hidePlaybackNotification(it)
-        }
-    }
-
-    fun seekTo(ratio: Float) {
-        val state = _playbackState.value
-        val totalMs = if (state.durationMs > 0) state.durationMs else 15000
-        val targetMs = (totalMs * ratio).toInt()
-        try {
-            mediaPlayer?.seekTo(targetMs)
-        } catch (_: Exception) {}
-        _playbackState.value = state.copy(
-            currentPositionMs = targetMs,
-            progress = ratio.coerceIn(0f, 1f)
-        )
-        lastContext?.let { updateNotification(it) }
-    }
-
-    private fun updateNotification(context: Context) {
-        val state = _playbackState.value
-        if (state.activeMessageId == null) {
-            MediaNotificationHelper.hidePlaybackNotification(context)
-            return
-        }
-        val currentSec = state.currentPositionMs / 1000
-        val totalSec = state.durationMs / 1000
-        val timeText = String.format("%02d:%02d / %02d:%02d", currentSec / 60, currentSec % 60, totalSec / 60, totalSec % 60)
-        val statusText = if (state.isPlaying) "Playing • $timeText" else "Paused • $timeText"
-        MediaNotificationHelper.showPlaybackNotification(
-            context = context,
-            title = currentTitle,
-            subtitle = statusText,
-            isPlaying = state.isPlaying
-        )
     }
 
     private fun startProgressTracker() {
-        stopProgressTracker()
-        progressRunnable = object : Runnable {
-            override fun run() {
-                val state = _playbackState.value
-                if (!state.isPlaying || state.activeMessageId == null) return
-
-                val currentMs: Int
-                val totalMs = if (state.durationMs > 0) state.durationMs else 15000
-
-                if (mediaPlayer != null && mediaPlayer!!.isPlaying) {
-                    currentMs = mediaPlayer!!.currentPosition
-                } else {
-                    currentMs = (state.currentPositionMs + 200).coerceAtMost(totalMs)
+        progressJob?.cancel()
+        progressJob = scope.launch {
+            while (isActive) {
+                val player = mediaPlayer
+                if (player != null && player.isPlaying) {
+                    val current = player.currentPosition.toLong()
+                    val total = player.duration.toLong().coerceAtLeast(1L)
+                    val progress = (current.toFloat() / total.toFloat()).coerceIn(0f, 1f)
+                    _playbackState.value = _playbackState.value.copy(
+                        progress = progress,
+                        currentPositionMs = current
+                    )
                 }
-
-                if (currentMs >= totalMs) {
-                    stop(lastContext)
-                    return
-                }
-
-                val progress = (currentMs.toFloat() / totalMs.toFloat()).coerceIn(0f, 1f)
-                _playbackState.value = state.copy(
-                    currentPositionMs = currentMs,
-                    progress = progress
-                )
-
-                handler.postDelayed(this, 200)
+                delay(100)
             }
         }
-        handler.post(progressRunnable!!)
     }
+}
 
-    private fun stopProgressTracker() {
-        progressRunnable?.let { handler.removeCallbacks(it) }
-        progressRunnable = null
+object MediaNotificationHelper {
+    private const val CHANNEL_ID = "telegram_media_playback"
+    private const val CHANNEL_NAME = "Media Playback"
+
+    fun createNotificationChannel(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Shows media playback controls"
+                setShowBadge(false)
+            }
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            manager?.createNotificationChannel(channel)
+        }
     }
 }

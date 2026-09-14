@@ -1,12 +1,6 @@
 package com.example.ui.screens
 
-import com.example.ui.theme.appPalette
-import android.Manifest
-import android.content.pm.PackageManager
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,28 +20,20 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Sort
-import androidx.compose.material.icons.filled.Call
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Group
-import androidx.compose.material.icons.filled.Campaign
-import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.GroupAdd
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -58,29 +44,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
+import coil.compose.AsyncImage
 import com.example.data.api.ApiContact
-import com.example.ui.components.AvatarView
 import com.example.ui.components.TelegramBottomNav
+import com.example.ui.locale.LocalAppStrings
+import com.example.ui.theme.appPalette
 
-/**
- * Contacts screen — shows REAL device contacts filtered down to only
- * registered 7eve9Chat users. Per the user's spec:
- *
- *   - Search bar at the top
- *   - New Group button
- *   - New Channel button
- *   - Below: list of device contacts who are registered users
- *     (POST /auth/check-contacts returns only registered users)
- *
- * Tapping a contact opens a private chat with them via
- * GET /messages/conversations/{userId}.
- */
 @Composable
 fun ContactsScreen(
     contacts: List<ApiContact>,
@@ -96,137 +69,168 @@ fun ContactsScreen(
     onCreateGroup: (name: String, type: String, description: String?) -> Unit,
     selectedBottomNavIndex: Int = 1
 ) {
-    val context = LocalContext.current
-    val snackbarHostState = remember { SnackbarHostState() }
-    var query by remember { mutableStateOf("") }
+    val palette = appPalette
+    val strings = LocalAppStrings.current
+
+    var searchQuery by remember { mutableStateOf("") }
     var showAddDialog by remember { mutableStateOf(false) }
-    var showCreateGroupDialog by remember { mutableStateOf(false) }
-    var showCreateChannelDialog by remember { mutableStateOf(false) }
-    var hasContactsPermission by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) ==
-                PackageManager.PERMISSION_GRANTED
-        )
-    }
+    var newContactPhone by remember { mutableStateOf("") }
 
-    val contactsPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        hasContactsPermission = granted
-        if (granted) onLaunchLoad()
-    }
+    var showGroupDialog by remember { mutableStateOf(false) }
+    var groupName by remember { mutableStateOf("") }
+    var groupType by remember { mutableStateOf("group") }
 
-    // First time the screen is shown: ask for contacts permission + load
     LaunchedEffect(Unit) {
-        if (hasContactsPermission) {
-            onLaunchLoad()
-        } else {
-            contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
-        }
+        onLaunchLoad()
     }
 
-    // Show add-contact feedback as a snackbar
-    LaunchedEffect(addContactStatus) {
-        if (!addContactStatus.isNullOrBlank()) {
-            snackbarHostState.showSnackbar(addContactStatus)
-            onClearAddStatus()
-        }
-    }
-
-    val filtered = remember(contacts, query) {
-        if (query.isBlank()) contacts
+    val filteredContacts = remember(contacts, searchQuery) {
+        if (searchQuery.isBlank()) contacts
         else contacts.filter {
-            (it.name?.contains(query, ignoreCase = true) == true) ||
-                    (it.username?.contains(query, ignoreCase = true) == true) ||
-                    (it.phone?.contains(query) == true)
+            (it.name?.contains(searchQuery, ignoreCase = true) == true) ||
+            (it.phone?.contains(searchQuery, ignoreCase = true) == true) ||
+            (it.username?.contains(searchQuery, ignoreCase = true) == true)
         }
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(appPalette.chatListBg)
+            .background(palette.chatListBg)
+            .statusBarsPadding()
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            ContactsHeader()
-            SearchBar(query = query, onQueryChange = { query = it })
-
-            // === New Group / New Channel buttons ===
+            // Header
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                ActionChip(
-                    modifier = Modifier.weight(1f),
-                    icon = Icons.Default.Group,
-                    label = "New Group",
-                    onClick = { showCreateGroupDialog = true }
+                Text(
+                    text = strings.contactsTitle,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = palette.textPrimary
                 )
-                ActionChip(
-                    modifier = Modifier.weight(1f),
-                    icon = Icons.Default.Campaign,
-                    label = "New Channel",
-                    onClick = { showCreateChannelDialog = true }
-                )
-            }
 
-            when {
-                !hasContactsPermission -> {
-                    PermissionPrompt(
-                        onAllow = { contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS) }
-                    )
-                }
-                isLoading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(color = appPalette.primary)
+                Row {
+                    TextButton(onClick = { showGroupDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Default.GroupAdd,
+                            contentDescription = "New Group",
+                            tint = palette.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(strings.newGroup, color = palette.primary, fontSize = 14.sp)
                     }
                 }
-                errorMessage != null && contacts.isEmpty() -> {
-                    ErrorState(
-                        message = errorMessage,
-                        onRetry = { onLaunchLoad() }
-                    )
+            }
+
+            // Search input
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text(strings.searchContacts, color = palette.textSecondary) },
+                leadingIcon = {
+                    Icon(Icons.Default.Search, contentDescription = null, tint = palette.textSecondary)
+                },
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = palette.surfaceVariant.copy(alpha = 0.5f),
+                    unfocusedContainerColor = palette.surfaceVariant.copy(alpha = 0.5f),
+                    focusedBorderColor = palette.primary,
+                    unfocusedBorderColor = Color.Transparent,
+                    focusedTextColor = palette.textPrimary,
+                    unfocusedTextColor = palette.textPrimary
+                )
+            )
+
+            // Status or error banner
+            if (!addContactStatus.isNullOrBlank()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .background(palette.primary.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                        .padding(8.dp)
+                ) {
+                    Text(text = addContactStatus, color = palette.primary, fontSize = 13.sp)
                 }
-                filtered.isEmpty() && contacts.isNotEmpty() -> {
-                    EmptyState(message = "No contacts match \"$query\"")
+            }
+
+            // Contacts List
+            if (isLoading && contacts.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = palette.primary)
                 }
-                filtered.isEmpty() -> {
-                    EmptyState(
-                        message = "None of your device contacts are on 7eve9Chat yet. " +
-                            "Tap + to invite someone by username or phone."
-                    )
-                }
-                else -> {
-                    LazyColumn(modifier = Modifier.fillMaxSize()) {
-                        items(filtered, key = { it._id ?: it.username ?: it.phone ?: it.name ?: "" }) { contact ->
-                            ContactRow(contact = contact, onClick = { onContactClick(contact) })
+            } else if (filteredContacts.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = strings.noContactsFound,
+                            color = palette.textSecondary,
+                            fontSize = 15.sp
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = { showAddDialog = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = palette.primary)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(strings.addContact)
                         }
-                        item { Spacer(modifier = Modifier.height(100.dp)) }
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                ) {
+                    items(filteredContacts, key = { it._id ?: it.phone ?: it.hashCode().toString() }) { contact ->
+                        ContactRow(
+                            contact = contact,
+                            onClick = { onContactClick(contact) }
+                        )
+                    }
+                    item {
+                        Spacer(modifier = Modifier.height(88.dp))
                     }
                 }
             }
         }
 
-        // FAB
+        // Floating Action Button to Add Contact
         FloatingActionButton(
             onClick = { showAddDialog = true },
-            containerColor = appPalette.primary,
+            containerColor = palette.primary,
             contentColor = Color.White,
-            shape = CircleShape,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 80.dp, end = 16.dp)
+                .padding(end = 20.dp, bottom = 90.dp)
         ) {
-            Icon(Icons.Default.PersonAdd, contentDescription = "Add contact")
+            Icon(Icons.Default.Add, contentDescription = "Add Contact")
         }
 
-        // Floating glass bottom nav overlay — at Box level so it's flush
-        // with the screen bottom, same as ChatListScreen
+        // Bottom Navigation
         TelegramBottomNav(
             selectedIndex = selectedBottomNavIndex,
             onSelect = onSelectBottomNav,
@@ -236,221 +240,116 @@ fun ContactsScreen(
                 .navigationBarsPadding()
         )
 
-        // Snackbar host at bottom
-        SnackbarHost(
-            snackbarHostState,
-            modifier = Modifier.align(Alignment.BottomCenter)
-        )
-    }
-
-    if (showAddDialog) {
-        AddContactDialog(
-            onDismiss = { showAddDialog = false },
-            onAdd = { identifier ->
-                onAddContact(identifier)
-                showAddDialog = false
-            }
-        )
-    }
-
-    if (showCreateGroupDialog) {
-        CreateConversationDialog(
-            title = "New Group",
-            type = "group",
-            onDismiss = { showCreateGroupDialog = false },
-            onCreate = { name, type, description ->
-                onCreateGroup(name, type, description)
-                showCreateGroupDialog = false
-            }
-        )
-    }
-
-    if (showCreateChannelDialog) {
-        CreateConversationDialog(
-            title = "New Channel",
-            type = "channel",
-            onDismiss = { showCreateChannelDialog = false },
-            onCreate = { name, type, description ->
-                onCreateGroup(name, type, description)
-                showCreateChannelDialog = false
-            }
-        )
-    }
-}
-
-@Composable
-private fun CreateConversationDialog(
-    title: String,
-    type: String,
-    onDismiss: () -> Unit,
-    onCreate: (name: String, type: String, description: String?) -> Unit
-) {
-    var name by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = appPalette.surface,
-        titleContentColor = appPalette.textPrimary,
-        title = { Text(title, color = appPalette.textPrimary, fontWeight = FontWeight.Bold) },
-        text = {
-            Column {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it.take(64) },
-                    label = { Text("Name", color = appPalette.textSecondary) },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = appPalette.primary,
-                        unfocusedBorderColor = appPalette.surfaceVariant,
-                        focusedTextColor = appPalette.textPrimary,
-                        unfocusedTextColor = appPalette.textPrimary,
-                        cursorColor = appPalette.primary
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = description,
-                    onValueChange = { description = it.take(255) },
-                    label = { Text("Description (optional)", color = appPalette.textSecondary) },
-                    maxLines = 3,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = appPalette.primary,
-                        unfocusedBorderColor = appPalette.surfaceVariant,
-                        focusedTextColor = appPalette.textPrimary,
-                        unfocusedTextColor = appPalette.textPrimary,
-                        cursorColor = appPalette.primary
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    if (name.isNotBlank()) {
-                        onCreate(
-                            name.trim(),
-                            type,
-                            description.takeIf { it.isNotBlank() }
+        // Add Contact Dialog
+        if (showAddDialog) {
+            AlertDialog(
+                onDismissRequest = { showAddDialog = false },
+                title = { Text(strings.addContact, color = palette.textPrimary) },
+                text = {
+                    Column {
+                        Text("Enter phone number or user ID:", color = palette.textSecondary, fontSize = 13.sp)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = newContactPhone,
+                            onValueChange = { newContactPhone = it },
+                            placeholder = { Text("+1234567890") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
-                }
-            ) { Text("Create", color = appPalette.primary, fontWeight = FontWeight.SemiBold) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = appPalette.textSecondary)
-            }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (newContactPhone.isNotBlank()) {
+                                onAddContact(newContactPhone.trim())
+                                newContactPhone = ""
+                                showAddDialog = false
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = palette.primary)
+                    ) {
+                        Text("Add")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showAddDialog = false }) {
+                        Text("Cancel", color = palette.textSecondary)
+                    }
+                },
+                containerColor = palette.surface
+            )
         }
-    )
-}
 
-@Composable
-private fun ContactsHeader() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(appPalette.chatListBg)
-            .statusBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = "Contacts",
-            color = appPalette.textPrimary,
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.weight(1f)
-        )
-        IconButton(onClick = { /* future: sort options */ }) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.Sort,
-                contentDescription = "Sort",
-                tint = appPalette.textSecondary
+        // Create Group Dialog
+        if (showGroupDialog) {
+            AlertDialog(
+                onDismissRequest = { showGroupDialog = false },
+                title = { Text(if (groupType == "channel") strings.newChannel else strings.newGroup, color = palette.textPrimary) },
+                text = {
+                    Column {
+                        OutlinedTextField(
+                            value = groupName,
+                            onValueChange = { groupName = it },
+                            label = { Text("Title") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = { groupType = "group" },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (groupType == "group") palette.primary else palette.surfaceVariant
+                                )
+                            ) {
+                                Text("Group")
+                            }
+                            Button(
+                                onClick = { groupType = "channel" },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (groupType == "channel") palette.primary else palette.surfaceVariant
+                                )
+                            ) {
+                                Text("Channel")
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (groupName.isNotBlank()) {
+                                onCreateGroup(groupName.trim(), groupType, null)
+                                groupName = ""
+                                showGroupDialog = false
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = palette.primary)
+                    ) {
+                        Text("Create")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showGroupDialog = false }) {
+                        Text("Cancel", color = palette.textSecondary)
+                    }
+                },
+                containerColor = palette.surface
             )
         }
     }
 }
 
 @Composable
-private fun SearchBar(query: String, onQueryChange: (String) -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp)
-    ) {
-        TextField(
-            value = query,
-            onValueChange = onQueryChange,
-            placeholder = { Text("Search Contacts", color = appPalette.textSecondary) },
-            leadingIcon = {
-                Icon(Icons.Default.Search, contentDescription = null, tint = appPalette.textSecondary)
-            },
-            trailingIcon = {
-                if (query.isNotEmpty()) {
-                    IconButton(onClick = { onQueryChange("") }) {
-                        Icon(Icons.Default.Close, contentDescription = "Clear", tint = appPalette.textSecondary)
-                    }
-                }
-            },
-            singleLine = true,
-            shape = RoundedCornerShape(16.dp),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = appPalette.surface,
-                unfocusedContainerColor = appPalette.surface,
-                cursorColor = appPalette.primary,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                focusedTextColor = appPalette.textPrimary,
-                unfocusedTextColor = appPalette.textPrimary
-            ),
-            modifier = Modifier.fillMaxWidth()
-        )
-    }
-}
-
-@Composable
-private fun ActionChip(
-    modifier: Modifier = Modifier,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
+private fun ContactRow(
+    contact: ApiContact,
     onClick: () -> Unit
 ) {
-    Surface(
-        color = appPalette.surface,
-        shape = RoundedCornerShape(16.dp),
-        modifier = modifier
-            .height(52.dp)
-            .clickable(onClick = onClick)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxSize(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = appPalette.primary,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = label,
-                color = appPalette.textPrimary,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
+    val palette = appPalette
+    val name = contact.name ?: contact.username ?: contact.phone ?: "User"
+    val subtitle = if (!contact.phone.isNullOrBlank()) contact.phone else contact.username
 
-@Composable
-private fun ContactRow(contact: ApiContact, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -458,158 +357,45 @@ private fun ContactRow(contact: ApiContact, onClick: () -> Unit) {
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        AvatarView(
-            avatarUrl = contact.avatar,
-            title = contact.name ?: contact.username,
-            size = 48.dp
-        )
-        Spacer(modifier = Modifier.size(16.dp))
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(palette.primary.copy(alpha = 0.2f)),
+            contentAlignment = Alignment.Center
+        ) {
+            if (!contact.avatar.isNullOrBlank()) {
+                AsyncImage(
+                    model = contact.avatar,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Text(
+                    text = name.take(1).uppercase(),
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = palette.primary
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(14.dp))
+
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = contact.name ?: contact.username ?: "Unknown",
-                color = appPalette.textPrimary,
+                text = name,
                 fontSize = 16.sp,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Medium,
+                color = palette.textPrimary
             )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = contact.username?.let { "@$it" } ?: contact.phone ?: "last seen recently",
-                color = appPalette.textSecondary,
-                fontSize = 14.sp
-            )
-        }
-        if (contact.isVerified == true) {
-            Box(
-                modifier = Modifier
-                    .size(20.dp)
-                    .background(appPalette.primary, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("✓", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-    }
-}
-
-@Composable
-private fun AddContactDialog(
-    onDismiss: () -> Unit,
-    onAdd: (String) -> Unit
-) {
-    var identifier by remember { mutableStateOf("") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = appPalette.surface,
-        titleContentColor = appPalette.textPrimary,
-        title = { Text("Add Contact", color = appPalette.textPrimary) },
-        text = {
-            Column {
+            if (!subtitle.isNullOrBlank()) {
                 Text(
-                    text = "Enter phone number or @username",
-                    color = appPalette.textSecondary,
+                    text = subtitle,
                     fontSize = 13.sp,
-                    modifier = Modifier.padding(bottom = 12.dp)
+                    color = palette.textSecondary
                 )
-                OutlinedTextField(
-                    value = identifier,
-                    onValueChange = { identifier = it },
-                    placeholder = { Text("989123456789 or @alice", color = appPalette.textMuted) },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = appPalette.primary,
-                        unfocusedBorderColor = appPalette.surfaceVariant,
-                        focusedTextColor = appPalette.textPrimary,
-                        unfocusedTextColor = appPalette.textPrimary,
-                        cursorColor = appPalette.primary
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    if (identifier.isNotBlank()) onAdd(identifier.trim())
-                }
-            ) { Text("Add", color = appPalette.primary, fontWeight = FontWeight.SemiBold) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = appPalette.textSecondary)
-            }
-        }
-    )
-}
-
-@Composable
-private fun EmptyState(message: String) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(
-                imageVector = Icons.Default.Call,
-                contentDescription = null,
-                tint = appPalette.textMuted,
-                modifier = Modifier.size(48.dp)
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = message,
-                color = appPalette.textSecondary,
-                fontSize = 14.sp,
-                modifier = Modifier.padding(horizontal = 32.dp)
-            )
-        }
-    }
-}
-
-@Composable
-private fun PermissionPrompt(onAllow: () -> Unit) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(
-                imageVector = Icons.Default.PersonAdd,
-                contentDescription = null,
-                tint = appPalette.textMuted,
-                modifier = Modifier.size(48.dp)
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "Allow access to your contacts to see who's on 7eve9Chat",
-                color = appPalette.textSecondary,
-                fontSize = 14.sp,
-                modifier = Modifier.padding(horizontal = 32.dp)
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            TextButton(onClick = onAllow) {
-                Text("Allow Contacts", color = appPalette.primary, fontWeight = FontWeight.SemiBold)
-            }
-        }
-    }
-}
-
-@Composable
-private fun ErrorState(message: String, onRetry: () -> Unit) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = message,
-                color = appPalette.textSecondary,
-                fontSize = 14.sp,
-                modifier = Modifier.padding(horizontal = 32.dp)
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            TextButton(onClick = onRetry) {
-                Text("Retry", color = appPalette.primary, fontWeight = FontWeight.SemiBold)
             }
         }
     }

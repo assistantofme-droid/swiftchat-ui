@@ -35,7 +35,7 @@ fun ImageCollageView(
             .clip(RoundedCornerShape(16.dp))
             .background(Color(0xFF1E2C3A))
     ) {
-        val res = photoResId ?: R.drawable.img_retro_guy_collage
+        val res = photoResId ?: R.drawable.app_logo
         Image(
             painter = painterResource(id = res),
             contentDescription = "Vintage Collage Photos",

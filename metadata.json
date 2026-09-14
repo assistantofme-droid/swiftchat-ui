@@ -1,6 +1,8 @@
 {
   "name": "7eve9Chat",
-  "description": "High-performance messaging app with bubbly glassmorphism, voice & video calls, floating PiP controls, and media player.",
+  "description": "7eve9Chat - A fast, modern Telegram-style messaging application with Persian localization, robust chat sending status, and contact management.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

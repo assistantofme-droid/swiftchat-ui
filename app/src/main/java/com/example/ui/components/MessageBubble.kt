@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,17 +21,16 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DoneAll
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Poll
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -45,6 +45,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -55,7 +56,6 @@ import coil.compose.AsyncImage
 import com.example.R
 import com.example.data.api.ApiClient
 import com.example.data.model.MessageItem
-import com.example.data.model.MessageStatus
 import com.example.data.model.MessageType
 import com.example.ui.media.AudioPlayerManager
 import com.example.ui.theme.TelegramBubbleDatePill
@@ -163,7 +163,7 @@ fun MessageBubble(
                 val isThisPlaying = audioState.activeMessageId == message.id && audioState.isPlaying
                 val progress = if (audioState.activeMessageId == message.id) audioState.progress else 0f
                 val currentSeconds = if (audioState.activeMessageId == message.id) {
-                    audioState.currentPositionMs / 1000
+                    (audioState.currentPositionMs / 1000).toInt()
                 } else {
                     message.duration ?: 24
                 }
@@ -321,11 +321,9 @@ private fun StandardTextBubble(
                     )
 
                     if (message.isOutgoing) {
-                        Icon(
-                            imageVector = messageStatusIcon(message),
-                            contentDescription = if (message.isRead) "Read" else "Sent",
-                            tint = messageStatusTint(message),
-                            modifier = Modifier.size(15.dp)
+                        MessageStatusIndicator(
+                            message = message,
+                            size = 14.dp
                         )
                     }
                 }
@@ -412,11 +410,9 @@ private fun PhotoBubble(
                         fontSize = 11.sp
                     )
                     if (message.isOutgoing) {
-                        Icon(
-                            imageVector = messageStatusIcon(message),
-                            contentDescription = "Status",
-                            tint = messageStatusTint(message),
-                            modifier = Modifier.size(13.dp)
+                        MessageStatusIndicator(
+                            message = message,
+                            size = 13.dp
                         )
                     }
                 }
@@ -537,11 +533,9 @@ private fun VideoBubble(
                     fontSize = 11.sp
                 )
                 if (message.isOutgoing) {
-                    Icon(
-                        imageVector = messageStatusIcon(message),
-                        contentDescription = "Status",
-                        tint = messageStatusTint(message),
-                        modifier = Modifier.size(13.dp)
+                    MessageStatusIndicator(
+                        message = message,
+                        size = 13.dp
                     )
                 }
             }
@@ -654,11 +648,9 @@ private fun AudioMessageBubble(
                                 fontSize = 11.sp
                             )
                             if (message.isOutgoing) {
-                                Icon(
-                                    imageVector = messageStatusIcon(message),
-                                    contentDescription = "Status",
-                                    tint = messageStatusTint(message),
-                                    modifier = Modifier.size(14.dp)
+                                MessageStatusIndicator(
+                                    message = message,
+                                    size = 14.dp
                                 )
                             }
                         }
@@ -844,7 +836,7 @@ fun ImageCollageView(
             )
     ) {
         androidx.compose.foundation.Image(
-            painter = painterResource(id = photoResId ?: R.drawable.img_chat_wallpaper),
+            painter = painterResource(id = photoResId ?: R.drawable.app_logo),
             contentDescription = "Media Collage",
             modifier = Modifier.matchParentSize(),
             contentScale = ContentScale.Crop
@@ -945,11 +937,10 @@ private fun LocationBubble(
                     Text(text = message.time, color = TelegramTextSecondary, fontSize = 11.sp)
                     if (message.isOutgoing) {
                         Spacer(modifier = Modifier.width(3.dp))
-                        Icon(
-                            imageVector = messageStatusIcon(message),
-                            contentDescription = null,
-                            tint = TelegramCheckBlue,
-                            modifier = Modifier.size(13.dp)
+                        MessageStatusIndicator(
+                            message = message,
+                            overrideColor = TelegramCheckBlue,
+                            size = 13.dp
                         )
                     }
                 }
@@ -1156,11 +1147,10 @@ private fun FileBubble(
                     Text(text = message.time, color = TelegramTextSecondary, fontSize = 11.sp)
                     if (message.isOutgoing) {
                         Spacer(modifier = Modifier.width(3.dp))
-                        Icon(
-                            imageVector = messageStatusIcon(message),
-                            contentDescription = null,
-                            tint = TelegramCheckBlue,
-                            modifier = Modifier.size(13.dp)
+                        MessageStatusIndicator(
+                            message = message,
+                            overrideColor = TelegramCheckBlue,
+                            size = 13.dp
                         )
                     }
                 }
@@ -1169,25 +1159,107 @@ private fun FileBubble(
     }
 }
 
-/** Returns the appropriate icon for the message's delivery status. */
-private fun messageStatusIcon(message: MessageItem): androidx.compose.ui.graphics.vector.ImageVector {
-    return when (message.status) {
-        MessageStatus.SENDING -> Icons.Default.Schedule      // Clock
-        MessageStatus.SENT -> Icons.Default.Check            // Single check
-        MessageStatus.DELIVERED -> Icons.Default.DoneAll     // Double check (grey)
-        MessageStatus.READ -> Icons.Default.DoneAll          // Double check (blue)
-        MessageStatus.FAILED -> Icons.Default.ErrorOutline   // Error
+@Composable
+fun MessageStatusIndicator(
+    message: MessageItem,
+    modifier: Modifier = Modifier,
+    overrideColor: Color? = null,
+    size: androidx.compose.ui.unit.Dp = 13.dp
+) {
+    if (!message.isOutgoing) return
+    if (message.isPending) {
+        Icon(
+            imageVector = Icons.Default.Schedule,
+            contentDescription = "Sending...",
+            tint = overrideColor ?: Color.White.copy(alpha = 0.75f),
+            modifier = modifier.size(size)
+        )
+    } else {
+        Icon(
+            imageVector = if (message.isRead) Icons.Default.DoneAll else Icons.Default.Check,
+            contentDescription = if (message.isRead) "Read" else "Sent",
+            tint = if (message.isRead) TelegramCheckBlue else (overrideColor ?: Color.White.copy(alpha = 0.85f)),
+            modifier = modifier.size(size)
+        )
     }
 }
 
-/** Returns the appropriate tint color for the message's delivery status. */
 @Composable
-private fun messageStatusTint(message: MessageItem): Color {
-    return when (message.status) {
-        MessageStatus.SENDING -> Color.White.copy(alpha = 0.6f)
-        MessageStatus.SENT -> Color.White.copy(alpha = 0.75f)
-        MessageStatus.DELIVERED -> Color.White.copy(alpha = 0.75f)
-        MessageStatus.READ -> TelegramCheckBlue
-        MessageStatus.FAILED -> Color(0xFFFF5252)
+fun TelegramQuickReactionPopup(
+    visible: Boolean,
+    onSelectReaction: (String) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (!visible) return
+    val reactions = listOf("👍", "❤️", "🔥", "😂", "👏", "⚡", "🎉")
+    Box(
+        modifier = modifier
+            .shadow(12.dp, RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color(0xE61E2C3A))
+            .border(0.8.dp, TelegramGlassBorder, RoundedCornerShape(20.dp))
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            reactions.forEach { emoji ->
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .clickable { onSelectReaction(emoji) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = emoji, fontSize = 18.sp)
+                }
+            }
+        }
     }
 }
+
+@Composable
+fun TelegramAudioWaveform(
+    progress: Float,
+    isPlaying: Boolean,
+    seed: Int,
+    playedColor: Color,
+    unplayedColor: Color,
+    onSeek: (Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val barCount = 36
+    val heights = remember(seed) {
+        val rand = java.util.Random(seed.toLong())
+        List(barCount) { 4.dp + (rand.nextFloat() * 16f).dp }
+    }
+
+    Row(
+        modifier = modifier
+            .height(26.dp)
+            .pointerInput(Unit) {
+                detectTapGestures { offset ->
+                    val ratio = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
+                    onSeek(ratio)
+                }
+            },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        heights.forEachIndexed { index, barHeight ->
+            val barRatio = (index + 1).toFloat() / barCount
+            val isPlayed = barRatio <= progress
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(barHeight)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(if (isPlayed) playedColor else unplayedColor)
+            )
+        }
+    }
+}
+
+

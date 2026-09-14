@@ -59,7 +59,7 @@ fun TelegramBottomNav(
     modifier: Modifier = Modifier
 ) {
     val palette = appPalette
-    val strings = com.example.ui.theme.LocalAppStrings.current
+    val strings = com.example.ui.locale.LocalAppStrings.current
 
     Surface(
         color = palette.glassHeader.copy(alpha = 0.92f),

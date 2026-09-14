@@ -97,12 +97,23 @@ fun AvatarView(
                 }
             }
             avatarType == AvatarType.MOTORCYCLE -> {
-                Image(
-                    painter = painterResource(id = R.drawable.img_avatar_motorcycle),
-                    contentDescription = "Avatar",
-                    modifier = Modifier.matchParentSize(),
-                    contentScale = ContentScale.Crop
-                )
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(Color(0xFF2A5298), Color(0xFF1E3C72))
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.DirectionsCar,
+                        contentDescription = "Avatar",
+                        tint = Color.White,
+                        modifier = Modifier.size(size * 0.55f)
+                    )
+                }
             }
             avatarType == AvatarType.GALAXY -> {
                 Box(

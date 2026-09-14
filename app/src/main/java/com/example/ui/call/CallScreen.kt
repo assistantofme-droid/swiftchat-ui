@@ -66,7 +66,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.example.ui.components.TelegramGlassBackground
 import com.example.ui.theme.TelegramDarkBg
 import com.example.ui.theme.TelegramGlassBorder
 import com.example.ui.theme.TelegramPrimary
@@ -574,3 +573,42 @@ fun CompactPipCallView(
         }
     }
 }
+
+@Composable
+fun TelegramGlassBackground(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF0F1A24),
+                        Color(0xFF132230),
+                        Color(0xFF0C141D)
+                    )
+                )
+            )
+    ) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .size(240.dp)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(Color(0x332AABEE), Color.Transparent)
+                    )
+                )
+        )
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .size(300.dp)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(Color(0x2864B5F6), Color.Transparent)
+                    )
+                )
+        )
+    }
+}
+

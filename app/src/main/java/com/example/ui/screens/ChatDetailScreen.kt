@@ -1,27 +1,15 @@
 package com.example.ui.screens
 
-import com.example.ui.theme.appPalette
-import com.example.ui.theme.TelegramGlassInput
-import com.example.ui.theme.TelegramSendFabGradient
-import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -38,37 +26,33 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Call
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.filled.SentimentSatisfiedAlt
+import androidx.compose.material.icons.filled.Mood
 import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.data.model.ChatItem
 import com.example.data.model.GifItem
 import com.example.data.model.MediaPickerItem
@@ -76,619 +60,340 @@ import com.example.data.model.MessageItem
 import com.example.data.model.StickerItem
 import com.example.ui.components.AttachmentBottomSheet
 import com.example.ui.components.AvatarView
-import com.example.ui.components.GroupProfileModal
+import com.example.ui.components.CreatePollDialog
 import com.example.ui.components.MessageBubble
-import com.example.ui.components.MessageContextMenuPopup
 import com.example.ui.components.PhotoViewerDialog
+import com.example.ui.components.SendLocationDialog
 import com.example.ui.components.StickerGifPickerSheet
-import com.example.ui.components.TelegramGlassBackground
-import com.example.ui.components.TelegramVoiceTopBanner
 import com.example.ui.components.UserProfileData
 import com.example.ui.components.UserProfileModal
-import com.example.ui.components.VideoPlayerDialog
-import com.example.ui.media.AudioPlayerManager
-import kotlinx.coroutines.launch
+import com.example.ui.locale.LocalAppStrings
+import com.example.ui.theme.TelegramPrimary
+import com.example.ui.theme.appPalette
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatDetailScreen(
     chat: ChatItem,
     messages: List<MessageItem>,
     isAttachmentSheetOpen: Boolean,
-    isStickerSheetOpen: Boolean = false,
-    stickers: List<StickerItem> = emptyList(),
-    gifs: List<GifItem> = emptyList(),
-    isStickersLoading: Boolean = false,
-    activePhotoMessage: MessageItem? = null,
-    activeVideoMessage: MessageItem? = null,
-    isProfileModalOpen: Boolean = false,
-    profileUser: UserProfileData? = null,
-    isProfileUpdating: Boolean = false,
+    isStickerSheetOpen: Boolean,
+    stickers: List<StickerItem>,
+    gifs: List<GifItem>,
+    isStickersLoading: Boolean,
+    activePhotoMessage: MessageItem?,
+    activeVideoMessage: MessageItem?,
+    isProfileModalOpen: Boolean,
+    profileUser: UserProfileData?,
+    isProfileUpdating: Boolean,
     onBack: () -> Unit,
     onOpenAttachmentSheet: () -> Unit,
     onCloseAttachmentSheet: () -> Unit,
-    onOpenStickerSheet: () -> Unit = {},
-    onCloseStickerSheet: () -> Unit = {},
-    onSelectSticker: (StickerItem) -> Unit = {},
-    onSelectGif: (GifItem) -> Unit = {},
+    onOpenStickerSheet: () -> Unit,
+    onCloseStickerSheet: () -> Unit,
+    onSelectSticker: (StickerItem) -> Unit,
+    onSelectGif: (GifItem) -> Unit,
     onSendMessage: (String) -> Unit,
-    onSendMedia: (List<MediaPickerItem>) -> Unit = {},
-    onSendAudio: () -> Unit = {},
-    onSendVideo: () -> Unit = {},
+    onSendMedia: (List<MediaPickerItem>) -> Unit,
+    onSendAudio: () -> Unit,
+    onSendVideo: () -> Unit,
     onToggleReaction: (String, String) -> Unit,
-    onDeleteMessage: (String) -> Unit = {},
-    onEditMessage: (String, String) -> Unit = { _, _ -> },
-    onPinMessage: (MessageItem) -> Unit = {},
-    onSendLocation: (Double, Double, String) -> Unit = { _, _, _ -> },
-    onSendPoll: (String, List<String>, Boolean) -> Unit = { _, _, _ -> },
-    onSendFile: (String, String) -> Unit = { _, _ -> },
-    onSendMusic: (String, String) -> Unit = { _, _ -> },
-    onOpenPhotoViewer: (MessageItem) -> Unit = {},
-    onClosePhotoViewer: () -> Unit = {},
-    onOpenVideoPlayer: (MessageItem) -> Unit = {},
-    onCloseVideoPlayer: () -> Unit = {},
-    onOpenUserProfile: (String?) -> Unit = {},
-    onCloseUserProfile: () -> Unit = {},
-    onUpdateProfile: ((String, String, String) -> Unit)? = null,
-    onVoiceCall: () -> Unit = {},
-    onVideoCall: () -> Unit = {},
-    modifier: Modifier = Modifier
+    onDeleteMessage: (String) -> Unit,
+    onEditMessage: (String, String) -> Unit,
+    onPinMessage: (MessageItem) -> Unit,
+    onSendLocation: (Double, Double, String) -> Unit,
+    onSendPoll: (String, List<String>, Boolean) -> Unit,
+    onSendFile: (String, String) -> Unit,
+    onSendMusic: (String, String) -> Unit,
+    onOpenPhotoViewer: (MessageItem) -> Unit,
+    onClosePhotoViewer: () -> Unit,
+    onOpenVideoPlayer: (MessageItem) -> Unit,
+    onCloseVideoPlayer: () -> Unit,
+    onOpenUserProfile: (String) -> Unit,
+    onCloseUserProfile: () -> Unit,
+    onUpdateProfile: (String, String?, String?) -> Unit,
+    onVoiceCall: () -> Unit,
+    onVideoCall: () -> Unit
 ) {
+    val palette = appPalette
+    val strings = LocalAppStrings.current
+
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
-    val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-    var isPinnedVisible by remember { mutableStateOf(true) }
 
-    // Message click popup / context menu state
-    var selectedMessageForPopup by remember { mutableStateOf<MessageItem?>(null) }
-    var replyingMessage by remember { mutableStateOf<MessageItem?>(null) }
-    var editingMessage by remember { mutableStateOf<MessageItem?>(null) }
+    var showLocationDialog by remember { mutableStateOf(false) }
+    var showPollDialog by remember { mutableStateOf(false) }
 
-    val audioState by AudioPlayerManager.playbackState.collectAsState()
-    val density = LocalDensity.current
-    val isKeyboardOpen = WindowInsets.ime.getBottom(density) > 0
-
-    // Handle system back navigation priority
-    BackHandler {
-        when {
-            selectedMessageForPopup != null -> selectedMessageForPopup = null
-            activePhotoMessage != null -> onClosePhotoViewer()
-            activeVideoMessage != null -> onCloseVideoPlayer()
-            isProfileModalOpen -> onCloseUserProfile()
-            isStickerSheetOpen -> onCloseStickerSheet()
-            isAttachmentSheetOpen -> onCloseAttachmentSheet()
-            replyingMessage != null -> replyingMessage = null
-            editingMessage != null -> {
-                editingMessage = null
-                inputText = ""
-            }
-            else -> onBack()
-        }
-    }
-
-    // Auto-scroll on new messages
+    // Scroll to bottom when new messages arrive
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
+            listState.animateScrollToItem(messages.lastIndex)
         }
     }
 
     Box(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxSize()
-            .background(appPalette.bg)
+            .background(palette.chatListBg)
+            .statusBarsPadding()
     ) {
-        // High-end ambient glass canvas background with glowing light orbs
-        TelegramGlassBackground()
-
-        Column(modifier = Modifier.fillMaxSize()) {
-            // Glassmorphic Top App Bar
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(appPalette.glassHeader)
-                    .border(0.8.dp, appPalette.glassBorder)
-                    .statusBarsPadding()
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .imePadding()
+        ) {
+            // Header Bar
+            Surface(
+                color = palette.glassHeader,
+                shadowElevation = 2.dp,
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 6.dp, vertical = 7.dp),
+                        .padding(horizontal = 8.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = Color.White
+                            tint = palette.textPrimary
                         )
                     }
 
-                    // Contact / Group Avatar
-                    Box(modifier = Modifier.clickable { onOpenUserProfile(chat.id) }) {
-                        AvatarView(
-                            avatarType = chat.avatarType,
-                            avatarResId = chat.avatarResId,
-                            avatarUrl = chat.avatarUrl,
-                            title = chat.title,
-                            size = 42.dp
-                        )
-                        // Emerald Green Online Indicator Dot for 1-on-1 chats
-                        if (!chat.isGroup) {
-                            Box(
+                    // Avatar & Details
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onOpenUserProfile(chat.id) }
+                            .padding(horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (!chat.avatarUrl.isNullOrBlank()) {
+                            AsyncImage(
+                                model = chat.avatarUrl,
+                                contentDescription = null,
                                 modifier = Modifier
-                                    .size(11.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0xFF00E676))
-                                    .border(1.5.dp, appPalette.bg, CircleShape)
-                                    .align(Alignment.BottomEnd)
+                                    .size(40.dp)
+                                    .clip(CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            AvatarView(
+                                avatarType = chat.avatarType,
+                                size = 40.dp
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(10.dp))
+
+                        Column {
+                            Text(
+                                text = chat.title,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = palette.textPrimary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = if (chat.isOnline) strings.online else strings.offline,
+                                fontSize = 12.sp,
+                                color = if (chat.isOnline) Color(0xFF22C55E) else palette.textSecondary
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.width(10.dp))
-
-                    // Contact Name & Status
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { onOpenUserProfile(chat.id) }
-                    ) {
-                        Text(
-                            text = chat.title,
-                            color = appPalette.textPrimary,
-                            fontSize = 16.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = if (chat.isGroup) "44 members, 12 online" else if (chat.isTyping) "typing..." else "online",
-                            color = if (chat.isTyping) appPalette.primary else Color(0xFF5AB4F8),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-
-                    // Voice Call Action
+                    // Call Actions
                     IconButton(onClick = onVoiceCall) {
                         Icon(
                             imageVector = Icons.Default.Call,
                             contentDescription = "Voice Call",
-                            tint = appPalette.textSecondary,
-                            modifier = Modifier.size(22.dp)
+                            tint = palette.textPrimary
                         )
                     }
 
-                    // Video Call Action
                     IconButton(onClick = onVideoCall) {
                         Icon(
                             imageVector = Icons.Default.Videocam,
                             contentDescription = "Video Call",
-                            tint = appPalette.textSecondary,
-                            modifier = Modifier.size(23.dp)
-                        )
-                    }
-
-                    // 3-Dots Options -> Opens Profile
-                    IconButton(onClick = { onOpenUserProfile(chat.id) }) {
-                        Icon(
-                            imageVector = Icons.Default.MoreVert,
-                            contentDescription = "Options",
-                            tint = appPalette.textSecondary,
-                            modifier = Modifier.size(22.dp)
+                            tint = palette.textPrimary
                         )
                     }
                 }
             }
 
-            // Real Telegram Voice Top Floating Player Banner
-            TelegramVoiceTopBanner()
-
-            // Iconic Telegram Glass Pinned Message Banner
-            if (isPinnedVisible && messages.isNotEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xD0131E2A))
-                        .border(0.5.dp, Color(0x22FFFFFF))
-                        .clickable {
-                            coroutineScope.launch {
-                                listState.animateScrollToItem(0)
-                            }
-                        }
-                        .padding(horizontal = 14.dp, vertical = 6.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        // Cyan vertical bar
-                        Box(
-                            modifier = Modifier
-                                .width(2.5.dp)
-                                .height(28.dp)
-                                .clip(RoundedCornerShape(2.dp))
-                                .background(appPalette.primary)
-                        )
-
-                        Spacer(modifier = Modifier.width(10.dp))
-
-                        Icon(
-                            imageVector = Icons.Default.PushPin,
-                            contentDescription = "Pinned",
-                            tint = appPalette.primary,
-                            modifier = Modifier.size(16.dp)
-                        )
-
-                        Spacer(modifier = Modifier.width(6.dp))
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Pinned Message",
-                                color = appPalette.primary,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = messages.firstOrNull()?.text ?: "Welcome to Telegram",
-                                color = appPalette.textSecondary,
-                                fontSize = 12.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-
-                        IconButton(
-                            onClick = { isPinnedVisible = false },
-                            modifier = Modifier.size(22.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Unpin",
-                                tint = appPalette.textSecondary,
-                                modifier = Modifier.size(14.dp)
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Message List (Bubbly 60fps LazyColumn)
+            // Message list
             LazyColumn(
                 state = listState,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .padding(horizontal = 4.dp)
+                    .padding(horizontal = 8.dp)
             ) {
-                items(messages, key = { it.id }) { message ->
+                items(messages, key = { it.id }) { msg ->
                     MessageBubble(
-                        message = message,
-                        onReactionClick = {
-                            onToggleReaction(message.id, "❤️")
-                        },
-                        onSelectReaction = { emoji ->
-                            onToggleReaction(message.id, emoji)
-                        },
-                        onPhotoClick = {
-                            onOpenPhotoViewer(it)
-                        },
-                        onVideoClick = {
-                            onOpenVideoPlayer(it)
-                        },
+                        message = msg,
+                        onPhotoClick = { onOpenPhotoViewer(msg) },
+                        onVideoClick = { onOpenVideoPlayer(msg) },
+                        onSelectReaction = { emoji -> onToggleReaction(msg.id, emoji) },
                         onMessageClick = {
-                            selectedMessageForPopup = it
+                            if (msg.type == com.example.data.model.MessageType.PHOTO) {
+                                onOpenPhotoViewer(msg)
+                            } else if (msg.type == com.example.data.model.MessageType.VIDEO) {
+                                onOpenVideoPlayer(msg)
+                            }
                         }
                     )
                 }
             }
 
-            // Replying or Editing Banner above input bar
-            AnimatedVisibility(
-                visible = replyingMessage != null || editingMessage != null,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xE017212B))
-                        .border(0.5.dp, appPalette.glassBorder)
-                        .padding(horizontal = 14.dp, vertical = 6.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .width(3.dp)
-                                .height(32.dp)
-                                .clip(RoundedCornerShape(2.dp))
-                                .background(appPalette.primary)
-                        )
-
-                        Spacer(modifier = Modifier.width(10.dp))
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = if (editingMessage != null) "Edit Message" else "Reply to ${replyingMessage?.senderName ?: "User"}",
-                                color = appPalette.primary,
-                                fontSize = 12.5.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = (if (editingMessage != null) editingMessage?.text else replyingMessage?.text) ?: "Media",
-                                color = appPalette.textSecondary,
-                                fontSize = 12.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-
-                        IconButton(
-                            onClick = {
-                                replyingMessage = null
-                                if (editingMessage != null) {
-                                    editingMessage = null
-                                    inputText = ""
-                                }
-                            },
-                            modifier = Modifier.size(24.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Cancel",
-                                tint = appPalette.textSecondary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Fixed Bubbly Telegram Input Bar with accurate IME keyboard handling
-            Box(
+            // Bottom Input Bar
+            Surface(
+                color = palette.surface,
+                shadowElevation = 8.dp,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .then(if (isKeyboardOpen) Modifier.imePadding() else Modifier.navigationBarsPadding())
-                    .padding(horizontal = 8.dp, vertical = 6.dp)
+                    .navigationBarsPadding()
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Frosted Glass Main Capsule for Input & Attachments
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .shadow(6.dp, RoundedCornerShape(26.dp), spotColor = Color(0x66000000))
-                            .clip(RoundedCornerShape(26.dp))
-                            .background(TelegramGlassInput)
-                            .border(1.dp, appPalette.glassBorder, RoundedCornerShape(26.dp))
-                            .padding(horizontal = 6.dp, vertical = 3.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Emoji / Sticker Button
-                            IconButton(
-                                onClick = {
-                                    if (isStickerSheetOpen) {
-                                        onCloseStickerSheet()
-                                    } else {
-                                        if (isAttachmentSheetOpen) onCloseAttachmentSheet()
-                                        onOpenStickerSheet()
-                                    }
-                                },
-                                modifier = Modifier.size(38.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.SentimentSatisfiedAlt,
-                                    contentDescription = "Emoji & Stickers",
-                                    tint = if (isStickerSheetOpen) appPalette.primary else appPalette.textSecondary,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-
-                            // Clean Material TextField with no underline
-                            TextField(
-                                value = inputText,
-                                onValueChange = { inputText = it },
-                                placeholder = {
-                                    Text(
-                                        text = if (editingMessage != null) "Edit message..." else "Message",
-                                        color = appPalette.textSecondary,
-                                        fontSize = 16.sp
-                                    )
-                                },
-                                colors = TextFieldDefaults.colors(
-                                    focusedContainerColor = Color.Transparent,
-                                    unfocusedContainerColor = Color.Transparent,
-                                    disabledContainerColor = Color.Transparent,
-                                    cursorColor = appPalette.primary,
-                                    focusedIndicatorColor = Color.Transparent,
-                                    unfocusedIndicatorColor = Color.Transparent,
-                                    focusedTextColor = appPalette.textPrimary,
-                                    unfocusedTextColor = appPalette.textPrimary
-                                ),
-                                modifier = Modifier.weight(1f)
-                            )
-
-                            // Paperclip (سنجاق) Attachment Button
-                            IconButton(
-                                onClick = {
-                                    if (isAttachmentSheetOpen) {
-                                        onCloseAttachmentSheet()
-                                    } else {
-                                        if (isStickerSheetOpen) onCloseStickerSheet()
-                                        onOpenAttachmentSheet()
-                                    }
-                                },
-                                modifier = Modifier.size(38.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.AttachFile,
-                                    contentDescription = "Attach / سنجاق",
-                                    tint = if (isAttachmentSheetOpen) appPalette.primary else appPalette.textSecondary,
-                                    modifier = Modifier.size(23.dp)
-                                )
-                            }
-                        }
+                    IconButton(onClick = onOpenAttachmentSheet) {
+                        Icon(
+                            imageVector = Icons.Default.AttachFile,
+                            contentDescription = "Attach",
+                            tint = palette.textSecondary
+                        )
                     }
 
-                    Spacer(modifier = Modifier.width(6.dp))
+                    IconButton(onClick = onOpenStickerSheet) {
+                        Icon(
+                            imageVector = Icons.Default.Mood,
+                            contentDescription = "Stickers",
+                            tint = palette.textSecondary
+                        )
+                    }
 
-                    // Bubbly Floating Glass Send / Mic Action Button
-                    Box(
+                    OutlinedTextField(
+                        value = inputText,
+                        onValueChange = { inputText = it },
+                        placeholder = { Text(strings.messageHint, color = palette.textSecondary) },
+                        maxLines = 4,
                         modifier = Modifier
-                            .size(48.dp)
-                            .shadow(8.dp, CircleShape, spotColor = Color(0x662481CC))
-                            .clip(CircleShape)
-                            .background(TelegramSendFabGradient)
-                            .border(1.dp, Color(0x4DFFFFFF), CircleShape)
-                            .clickable {
-                                if (inputText.isNotBlank()) {
-                                    val currentEditing = editingMessage
-                                    if (currentEditing != null) {
-                                        onEditMessage(currentEditing.id, inputText)
-                                        editingMessage = null
-                                    } else {
-                                        onSendMessage(inputText)
-                                    }
-                                    replyingMessage = null
-                                    inputText = ""
-                                } else {
-                                    onSendAudio()
-                                }
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (inputText.isBlank()) {
+                            .weight(1f)
+                            .padding(horizontal = 4.dp),
+                        shape = RoundedCornerShape(20.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = palette.surfaceVariant.copy(alpha = 0.5f),
+                            unfocusedContainerColor = palette.surfaceVariant.copy(alpha = 0.5f),
+                            focusedBorderColor = Color.Transparent,
+                            unfocusedBorderColor = Color.Transparent,
+                            focusedTextColor = palette.textPrimary,
+                            unfocusedTextColor = palette.textPrimary
+                        )
+                    )
+
+                    if (inputText.isNotBlank()) {
+                        IconButton(
+                            onClick = {
+                                val textToSend = inputText.trim()
+                                inputText = ""
+                                onSendMessage(textToSend)
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Send,
+                                contentDescription = "Send",
+                                tint = palette.primary
+                            )
+                        }
+                    } else {
+                        IconButton(onClick = onSendAudio) {
                             Icon(
                                 imageVector = Icons.Default.Mic,
-                                contentDescription = "Voice note",
-                                tint = Color.White,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        } else {
-                            Icon(
-                                imageVector = if (editingMessage != null) Icons.Default.Edit else Icons.AutoMirrored.Filled.Send,
-                                contentDescription = "Send",
-                                tint = Color.White,
-                                modifier = Modifier.size(22.dp)
+                                contentDescription = "Voice message",
+                                tint = palette.textSecondary
                             )
                         }
                     }
                 }
             }
+        }
 
-            // Sticker & GIF Picker Bottom Sheet
+        // Attachments Sheet
+        if (isAttachmentSheetOpen) {
+            AttachmentBottomSheet(
+                visible = true,
+                onDismiss = onCloseAttachmentSheet,
+                onSendMedia = onSendMedia,
+                onSendLocation = { lat, lng, title -> onSendLocation(lat, lng, title) },
+                onSendPoll = { q, opts, anon -> onSendPoll(q, opts, anon) },
+                onSendFile = { name, uri -> onSendFile(name, uri) },
+                onSendMusic = { title, uri -> onSendMusic(title, uri) }
+            )
+        }
+
+        // Sticker / GIF Picker Sheet
+        if (isStickerSheetOpen) {
             StickerGifPickerSheet(
-                visible = isStickerSheetOpen,
+                visible = true,
+                onDismiss = onCloseStickerSheet,
                 stickers = stickers,
                 gifs = gifs,
                 isLoading = isStickersLoading,
-                onDismiss = onCloseStickerSheet,
-                onSelectSticker = { sticker ->
-                    onSelectSticker(sticker)
-                },
-                onSelectGif = { gif ->
-                    onSelectGif(gif)
-                },
-                onSelectEmoji = { emoji ->
-                    inputText += emoji
+                onSelectSticker = onSelectSticker,
+                onSelectGif = onSelectGif,
+                onSelectEmoji = { emoji -> onSendMessage(emoji) }
+            )
+        }
+
+        // Location Dialog
+        if (showLocationDialog) {
+            SendLocationDialog(
+                visible = true,
+                onDismiss = { showLocationDialog = false },
+                onSendLocation = { lat, lng, title ->
+                    onSendLocation(lat, lng, title)
+                    showLocationDialog = false
                 }
             )
         }
 
-        // Authentic Telegram Message Context Menu Popup (Reaction bar + Reply, Pin, Edit, Copy, Forward, Delete)
-        MessageContextMenuPopup(
-            message = selectedMessageForPopup,
-            visible = selectedMessageForPopup != null,
-            onDismiss = { selectedMessageForPopup = null },
-            onReaction = { emoji ->
-                selectedMessageForPopup?.let { msg ->
-                    onToggleReaction(msg.id, emoji)
+        // Poll Dialog
+        if (showPollDialog) {
+            CreatePollDialog(
+                visible = true,
+                onDismiss = { showPollDialog = false },
+                onCreatePoll = { q, opts, anon ->
+                    onSendPoll(q, opts, anon)
+                    showPollDialog = false
                 }
-            },
-            onReply = { msg ->
-                replyingMessage = msg
-                selectedMessageForPopup = null
-            },
-            onPin = { msg ->
-                onPinMessage(msg)
-                isPinnedVisible = true
-                selectedMessageForPopup = null
-            },
-            onEdit = { msg ->
-                editingMessage = msg
-                inputText = msg.text.orEmpty()
-                selectedMessageForPopup = null
-            },
-            onForward = { msg ->
-                selectedMessageForPopup = null
-            },
-            onDelete = { msg ->
-                onDeleteMessage(msg.id)
-                selectedMessageForPopup = null
-            }
-        )
+            )
+        }
 
-        // Glassy Attachment Bottom Sheet Overlay (Paperclip / سنجاق)
-        AttachmentBottomSheet(
-            visible = isAttachmentSheetOpen,
-            onDismiss = onCloseAttachmentSheet,
-            onSendMedia = onSendMedia,
-            onSendLocation = onSendLocation,
-            onSendPoll = onSendPoll,
-            onSendFile = onSendFile,
-            onSendMusic = onSendMusic
-        )
-
-        // Pinch-to-Zoom Photo Viewer Overlay
-        activePhotoMessage?.let { photoMsg ->
-            val url = photoMsg.mediaUrl
-                ?: if (photoMsg.photoResId != null) "android.resource://com.example/${photoMsg.photoResId}" else null
+        // Photo Viewer
+        if (activePhotoMessage != null) {
             PhotoViewerDialog(
-                photoUrl = url,
-                caption = photoMsg.text,
-                senderName = if (photoMsg.isOutgoing) "You" else (photoMsg.senderName ?: chat.title),
-                time = photoMsg.time,
+                photoUrl = activePhotoMessage.mediaUrl,
+                caption = activePhotoMessage.text,
+                senderName = activePhotoMessage.senderName,
+                time = activePhotoMessage.time,
                 onDismiss = onClosePhotoViewer
             )
         }
 
-        // Smooth Video Player Overlay
-        activeVideoMessage?.let { videoMsg ->
-            VideoPlayerDialog(
-                videoUrl = videoMsg.mediaUrl,
-                caption = videoMsg.text,
-                senderName = if (videoMsg.isOutgoing) "You" else (videoMsg.senderName ?: chat.title),
-                onDismiss = onCloseVideoPlayer
-            )
-        }
-
-        // Profile Modal - Displays Group Profile if chat.isGroup, otherwise User Profile Modal
-        if (chat.isGroup) {
-            GroupProfileModal(
-                visible = isProfileModalOpen,
-                groupName = chat.title,
-                groupAvatarUrl = chat.avatarUrl,
-                description = "Official Telegram Group. Share ideas, code, media, and connect with developers worldwide.",
-                onDismiss = onCloseUserProfile,
-                onMessageClick = onCloseUserProfile
-            )
-        } else {
-            UserProfileModal(
-                visible = isProfileModalOpen,
-                user = profileUser,
-                isUpdating = isProfileUpdating,
-                onDismiss = onCloseUserProfile,
-                onUpdateProfile = onUpdateProfile
-            )
-        }
+        // User Profile Modal
+        UserProfileModal(
+            visible = isProfileModalOpen,
+            user = profileUser,
+            isUpdating = isProfileUpdating,
+            onDismiss = onCloseUserProfile,
+            onUpdateProfile = onUpdateProfile
+        )
     }
 }
