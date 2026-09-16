@@ -269,12 +269,6 @@ data class ApiLocation(
 )
 
 @JsonClass(generateAdapter = true)
-data class ApiAudioMetadata(
-    @Json(name = "duration") val duration: Int? = null,
-    @Json(name = "waveform") val waveform: List<Int>? = null
-)
-
-@JsonClass(generateAdapter = true)
 data class ApiInlineKeyboardButton(
     @Json(name = "text") val text: String? = null,
     @Json(name = "url") val url: String? = null,
