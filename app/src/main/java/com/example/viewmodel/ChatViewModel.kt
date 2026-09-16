@@ -1848,7 +1848,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(isProfileModalOpen = false, profileUser = null) }
     }
 
-    fun updateProfile(name: String, username: String, bio: String) {
+    fun updateProfile(name: String, username: String?, bio: String?) {
         viewModelScope.launch {
             _uiState.update { it.copy(isProfileUpdating = true) }
             try {
@@ -2353,7 +2353,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 val conv = resp.body()!!
-                Log.d("ChatViewModel", "openPrivateChatWithContact: got conversation ${conv._id} type=${conv.type} participants=${conv.participants?.size}")
+                Log.d("ChatViewModel", "openPrivateChatWithContact: got conversation ${conv._id} type=${conv.type} participants=${conv.participantsCount}")
                 val chatItem = mapApiConversationToChatItem(conv)
 
                 // Single atomic state update: add chat + switch tab + select chat

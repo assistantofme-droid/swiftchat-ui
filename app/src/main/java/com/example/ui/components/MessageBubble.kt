@@ -7,6 +7,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -57,6 +58,7 @@ import com.example.data.model.MessageType
 import com.example.ui.media.AudioPlayerManager
 import com.example.ui.theme.TelegramBubbleDatePill
 import com.example.ui.theme.TelegramCheckBlue
+import com.example.ui.theme.TelegramSheetBg
 import com.example.ui.theme.TelegramGlassBorder
 import com.example.ui.theme.TelegramGlassHighlight
 import com.example.ui.theme.TelegramIncomingGradient
