@@ -374,7 +374,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             }
             return
         }
-        val cleanUsername = username.removePrefix("@").trim()
+        val cleanUsername = username?.removePrefix("@")?.trim() ?: ""
         if (!Regex("^[a-zA-Z0-9_]{5,32}$").matches(cleanUsername)) {
             _uiState.update {
                 it.copy(profileSetupError = "Username must be 5-32 chars, letters/numbers/_ only")
@@ -1852,12 +1852,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _uiState.update { it.copy(isProfileUpdating = true) }
             try {
-                val cleanUsername = username.removePrefix("@").trim()
+                val cleanUsername = username?.removePrefix("@")?.trim() ?: ""
                 val response = ApiClient.service.updateProfile(
                     UpdateProfileRequest(
                         name = name.trim(),
                         username = cleanUsername.ifBlank { null },
-                        bio = bio.trim()
+                        bio = bio?.trim()
                     )
                 )
 

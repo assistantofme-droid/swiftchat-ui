@@ -162,7 +162,7 @@ fun MessageBubble(
                 val isThisPlaying = audioState.activeMessageId == message.id && audioState.isPlaying
                 val progress = if (audioState.activeMessageId == message.id) audioState.progress else 0f
                 val currentSeconds = if (audioState.activeMessageId == message.id) {
-                    audioState.currentPositionMs / 1000
+                    (audioState.currentPositionMs / 1000).toInt()
                 } else {
                     message.duration ?: 24
                 }
