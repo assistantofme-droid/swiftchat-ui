@@ -66,7 +66,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.example.ui.components.TelegramGlassBackground
+
 import com.example.ui.theme.TelegramDarkBg
 import com.example.ui.theme.TelegramGlassBorder
 import com.example.ui.theme.TelegramPrimary
@@ -99,7 +99,7 @@ fun FullCallScreen(
             .fillMaxSize()
             .background(TelegramDarkBg)
     ) {
-        TelegramGlassBackground()
+        Box(modifier = Modifier.fillMaxSize().background(TelegramDarkBg.copy(alpha = 0.95f))) { }
 
         Column(
             modifier = Modifier

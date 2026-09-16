@@ -97,6 +97,7 @@ data class ChatItem(
     val avatarResId: Int? = null,
     val avatarUrl: String? = null,
     val isGroup: Boolean = false,
+    val isChannel: Boolean = false,
     val memberCount: Int = 0,
     val isOnline: Boolean = false
 ) {

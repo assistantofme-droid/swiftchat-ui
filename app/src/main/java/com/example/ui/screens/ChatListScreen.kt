@@ -62,7 +62,7 @@ import com.example.ui.theme.appPalette
 @Composable
 fun ChatListScreen(
     chats: List<ChatItem>,
-    selectedCategoryTab: Int,
+    selectedCategoryTab: String,
     selectedBottomNavIndex: Int,
     isSearching: Boolean,
     searchQuery: String,
@@ -74,7 +74,7 @@ fun ChatListScreen(
     folders: List<ChatFolder>,
     onSearchToggle: (Boolean) -> Unit,
     onSearchQueryChange: (String) -> Unit,
-    onCategoryTabSelect: (Int) -> Unit,
+    onCategoryTabSelect: (String) -> Unit,
     onBottomNavSelect: (Int) -> Unit,
     onChatClick: (ChatItem) -> Unit,
     onToggleTheme: () -> Unit,
@@ -89,10 +89,10 @@ fun ChatListScreen(
     }
 
     val filteredChats = remember(chats, selectedCategoryTab, searchQuery) {
-        var list = when (selectedCategoryTab) {
-            1 -> chats.filter { !it.isGroup && !it.isChannel }
-            2 -> chats.filter { it.isGroup }
-            3 -> chats.filter { it.isChannel }
+        var list = when {
+            selectedCategoryTab == tabs[1] -> chats.filter { !it.isGroup && !it.isChannel }
+            selectedCategoryTab == tabs[2] -> chats.filter { it.isGroup }
+            selectedCategoryTab == tabs[3] -> chats.filter { it.isChannel }
             else -> chats
         }
         if (searchQuery.isNotBlank()) {
@@ -224,14 +224,15 @@ fun ChatListScreen(
 
             // Category Tab Row
             ScrollableTabRow(
-                selectedTabIndex = selectedCategoryTab.coerceIn(0, tabs.lastIndex),
+                selectedTabIndex = tabs.indexOf(selectedCategoryTab).coerceAtLeast(0).coerceIn(0, tabs.lastIndex),
                 containerColor = Color.Transparent,
                 contentColor = palette.primary,
                 edgePadding = 16.dp,
                 indicator = { tabPositions ->
-                    if (selectedCategoryTab in tabPositions.indices) {
+                    val selectedIndex = tabs.indexOf(selectedCategoryTab).coerceAtLeast(0)
+                    if (selectedIndex in tabPositions.indices) {
                         TabRowDefaults.SecondaryIndicator(
-                            Modifier.tabIndicatorOffset(tabPositions[selectedCategoryTab]),
+                            Modifier.tabIndicatorOffset(tabPositions[selectedIndex]),
                             color = palette.primary
                         )
                     }
@@ -239,10 +240,10 @@ fun ChatListScreen(
                 divider = {}
             ) {
                 tabs.forEachIndexed { index, title ->
-                    val isSelected = selectedCategoryTab == index
+                    val isSelected = selectedCategoryTab == tabs[index]
                     Tab(
                         selected = isSelected,
-                        onClick = { onCategoryTabSelect(index) },
+                        onClick = { onCategoryTabSelect(tabs[index]) },
                         text = {
                             Text(
                                 text = title,

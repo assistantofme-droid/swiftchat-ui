@@ -172,7 +172,7 @@ fun MessageBubble(
                     displayedSeconds = currentSeconds,
                     onPlayPause = {
                         val url = message.mediaUrl ?: ""
-                        AudioPlayerManager.togglePlay(context, message.id, url, message.duration ?: 24)
+                        AudioPlayerManager.togglePlay(context, message.id, url, (message.duration ?: 24).toInt())
                     },
                     onSeek = { seekRatio ->
                         AudioPlayerManager.seekTo(seekRatio)
@@ -1160,6 +1160,47 @@ private fun FileBubble(
                             modifier = Modifier.size(13.dp)
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TelegramQuickReactionPopup(
+    visible: Boolean,
+    onSelectReaction: (String) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (!visible) return
+    val reactions = listOf("\uD83D\uDC4D", "\u2764\uFE0F", "\uD83D\uDD25", "\uD83D\uDE02", "\uD83D\uDC4F", "\u26A1", "\uD83C\uDF89")
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.4f))
+            .clickable { onDismiss() },
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(28.dp))
+                .background(TelegramSheetBg)
+                .padding(horizontal = 8.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            reactions.forEach { emoji ->
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .clickable {
+                            onSelectReaction(emoji)
+                            onDismiss()
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = emoji, fontSize = 24.sp)
                 }
             }
         }
