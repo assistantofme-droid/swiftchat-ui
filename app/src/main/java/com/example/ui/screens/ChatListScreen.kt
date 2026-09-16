@@ -21,16 +21,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.Brightness4
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Group
-import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -41,7 +39,10 @@ import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -147,41 +148,74 @@ fun ChatListScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "7eve9Chat",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = palette.textPrimary
+                        text = if (isRefreshing) "Updating..." else "connected",
+                        fontSize = 19.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = palette.textPrimary,
+                        modifier = Modifier.weight(1f)
                     )
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (isRefreshing) {
-                            CircularProgressIndicator(
-                                color = palette.primary,
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .padding(end = 8.dp),
-                                strokeWidth = 2.dp
+                    if (isRefreshing) {
+                        CircularProgressIndicator(
+                            color = palette.primary,
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp
+                        )
+                    }
+
+                    IconButton(onClick = { onSearchToggle(true) }) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Search",
+                            tint = palette.textSecondary,
+                            modifier = Modifier.size(23.dp)
+                        )
+                    }
+
+                    var showMenu by remember { mutableStateOf(false) }
+                    Box {
+                        IconButton(onClick = { showMenu = true }) {
+                            Icon(
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = "Menu",
+                                tint = palette.textSecondary,
+                                modifier = Modifier.size(23.dp)
                             )
                         }
-
-                        IconButton(onClick = { onSearchToggle(true) }) {
-                            Icon(
-                                imageVector = Icons.Default.Search,
-                                contentDescription = "Search",
-                                tint = palette.textPrimary
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false },
+                            modifier = Modifier.background(palette.surface)
+                        ) {
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = if (isDarkMode) "Light Mode" else "Dark Mode",
+                                        color = palette.textPrimary
+                                    )
+                                },
+                                onClick = {
+                                    showMenu = false
+                                    onToggleTheme()
+                                }
                             )
-                        }
-
-                        IconButton(onClick = onToggleTheme) {
-                            Icon(
-                                imageVector = if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
-                                contentDescription = "Toggle Theme",
-                                tint = palette.textPrimary
+                            DropdownMenuItem(
+                                text = { Text("New Group", color = palette.textPrimary) },
+                                onClick = {
+                                    showMenu = false
+                                    onNewGroup()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Saved Messages", color = palette.textPrimary) },
+                                onClick = {
+                                    showMenu = false
+                                    onOpenSavedMessages()
+                                }
                             )
                         }
                     }
@@ -274,18 +308,6 @@ fun ChatListScreen(
                     }
                 }
             }
-        }
-
-        // Floating Action Button to start chat / new message
-        FloatingActionButton(
-            onClick = { onBottomNavSelect(1) },
-            containerColor = palette.primary,
-            contentColor = Color.White,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 20.dp, bottom = 90.dp)
-        ) {
-            Icon(Icons.Default.Edit, contentDescription = "New Chat")
         }
 
         // Bottom Navigation

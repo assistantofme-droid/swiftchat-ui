@@ -1507,10 +1507,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun sendAudioMessage(
-        audioUrl: String = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+        audioUrl: String = "",
         duration: Int = 28,
         fileName: String = "Voice message"
     ) {
+        if (audioUrl.isBlank()) return  // Don't send mock audio
         val currentChatId = _uiState.value.selectedChatId ?: return
         val currentTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val localMessage = MessageItem(
@@ -1549,11 +1550,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun sendVideoMessage(
-        videoUrl: String = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+        videoUrl: String = "",
         duration: Int = 15,
-        thumbUrl: String = "https://images.unsplash.com/photo-1579202673506-ca3ce28943ef?w=400",
+        thumbUrl: String = "",
         caption: String? = null
     ) {
+        if (videoUrl.isBlank()) return  // Don't send mock video
         val currentChatId = _uiState.value.selectedChatId ?: return
         val currentTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val localMessage = MessageItem(

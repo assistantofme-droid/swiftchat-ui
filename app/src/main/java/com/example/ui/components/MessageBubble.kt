@@ -174,7 +174,7 @@ fun MessageBubble(
                     progress = progress,
                     displayedSeconds = currentSeconds,
                     onPlayPause = {
-                        val url = message.mediaUrl ?: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
+                        val url = message.mediaUrl ?: ""
                         AudioPlayerManager.togglePlay(context, message.id, url, message.duration ?: 24)
                     },
                     onSeek = { seekRatio ->
