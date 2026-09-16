@@ -32,6 +32,13 @@ data class ReactionItem(
     val count: Int = 1
 )
 
+/** Inline keyboard button for bot messages (reply markup). */
+data class InlineKeyboardButton(
+    val text: String,
+    val url: String? = null,
+    val callbackData: String? = null
+)
+
 data class MessageItem(
     val id: String,
     val text: String? = null,
@@ -41,15 +48,21 @@ data class MessageItem(
     val photoResId: Int? = null,
     val mediaUrl: String? = null,
     val videoThumbnailUrl: String? = null,
-    val duration: Int? = null, // Duration in seconds for audio/video
+    val duration: Int? = null,
     val fileName: String? = null,
     val senderName: String? = null,
     val senderAvatarUrl: String? = null,
     val reactions: List<ReactionItem> = emptyList(),
     val isRead: Boolean = true,
-    val isPending: Boolean = false,
-    val hasSingleCheck: Boolean = false,
-    val dateHeader: String? = null
+    val dateHeader: String? = null,
+    val isBot: Boolean = false,
+    val inlineKeyboard: List<List<InlineKeyboardButton>> = emptyList(),
+    val replyToText: String? = null,
+    val replyToSender: String? = null,
+    val audioTitle: String? = null,
+    val audioArtist: String? = null,
+    val audioCoverUrl: String? = null,
+    val audioWaveform: List<Int> = emptyList()
 )
 
 data class StickerItem(
@@ -84,7 +97,6 @@ data class ChatItem(
     val avatarResId: Int? = null,
     val avatarUrl: String? = null,
     val isGroup: Boolean = false,
-    val isChannel: Boolean = false,
     val memberCount: Int = 0,
     val isOnline: Boolean = false
 ) {

@@ -448,4 +448,10 @@ interface ApiService {
 
     @GET("ads/public")
     suspend fun getPublicAds(): Response<List<ApiAd>>
+
+    @GET("settings/public")
+    suspend fun getPublicSettings(): Response<List<Any>>
+
+    @GET("auth/startup-config")
+    suspend fun getStartupConfig(): Response<Any?>
 }

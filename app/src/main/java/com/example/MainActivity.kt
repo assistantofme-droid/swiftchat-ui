@@ -81,8 +81,8 @@ fun TelegramApp(
     val uiState by viewModel.uiState.collectAsState()
     val callState by CallManager.callState.collectAsState()
 
-    // Theme follows the user's Dark/Light toggle + language preference.
-    MyApplicationTheme(isDarkMode = uiState.isDarkMode, isPersian = uiState.language == "fa") {
+    // Theme follows the user's Dark/Light toggle.
+    MyApplicationTheme(isDarkMode = uiState.isDarkMode) {
         TelegramAppContent(viewModel = viewModel)
     }
 }
@@ -181,7 +181,7 @@ private fun TelegramAppContent(viewModel: ChatViewModel) {
                                 onOpenUserProfile = { viewModel.openUserProfile(it) },
                                 onCloseUserProfile = { viewModel.closeUserProfile() },
                                 onUpdateProfile = { name, username, bio ->
-                                    viewModel.updateProfile(name, username ?: "", bio ?: "")
+                                    viewModel.updateProfile(name, username, bio)
                                 },
                                 onVoiceCall = {
                                     CallManager.startCall(
@@ -360,7 +360,7 @@ private fun TelegramAppContent(viewModel: ChatViewModel) {
                             isUpdating = uiState.isProfileUpdating,
                             onDismiss = { viewModel.closeUserProfile() },
                             onUpdateProfile = { name, username, bio ->
-                                viewModel.updateProfile(name, username ?: "", bio ?: "")
+                                viewModel.updateProfile(name, username, bio)
                             }
                         )
                     }

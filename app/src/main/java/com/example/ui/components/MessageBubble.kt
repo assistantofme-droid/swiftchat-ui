@@ -6,7 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,7 +29,6 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Poll
-import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -45,7 +43,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -163,7 +160,7 @@ fun MessageBubble(
                 val isThisPlaying = audioState.activeMessageId == message.id && audioState.isPlaying
                 val progress = if (audioState.activeMessageId == message.id) audioState.progress else 0f
                 val currentSeconds = if (audioState.activeMessageId == message.id) {
-                    (audioState.currentPositionMs / 1000).toInt()
+                    audioState.currentPositionMs / 1000
                 } else {
                     message.duration ?: 24
                 }
@@ -321,9 +318,11 @@ private fun StandardTextBubble(
                     )
 
                     if (message.isOutgoing) {
-                        MessageStatusIndicator(
-                            message = message,
-                            size = 14.dp
+                        Icon(
+                            imageVector = if (message.isRead) Icons.Default.DoneAll else Icons.Default.Check,
+                            contentDescription = if (message.isRead) "Read" else "Sent",
+                            tint = if (message.isRead) TelegramCheckBlue else Color.White.copy(alpha = 0.75f),
+                            modifier = Modifier.size(15.dp)
                         )
                     }
                 }
@@ -410,9 +409,11 @@ private fun PhotoBubble(
                         fontSize = 11.sp
                     )
                     if (message.isOutgoing) {
-                        MessageStatusIndicator(
-                            message = message,
-                            size = 13.dp
+                        Icon(
+                            imageVector = if (message.isRead) Icons.Default.DoneAll else Icons.Default.Check,
+                            contentDescription = "Status",
+                            tint = if (message.isRead) TelegramCheckBlue else Color.White,
+                            modifier = Modifier.size(13.dp)
                         )
                     }
                 }
@@ -533,9 +534,11 @@ private fun VideoBubble(
                     fontSize = 11.sp
                 )
                 if (message.isOutgoing) {
-                    MessageStatusIndicator(
-                        message = message,
-                        size = 13.dp
+                    Icon(
+                        imageVector = if (message.isRead) Icons.Default.DoneAll else Icons.Default.Check,
+                        contentDescription = "Status",
+                        tint = if (message.isRead) TelegramCheckBlue else Color.White,
+                        modifier = Modifier.size(13.dp)
                     )
                 }
             }
@@ -648,9 +651,11 @@ private fun AudioMessageBubble(
                                 fontSize = 11.sp
                             )
                             if (message.isOutgoing) {
-                                MessageStatusIndicator(
-                                    message = message,
-                                    size = 14.dp
+                                Icon(
+                                    imageVector = if (message.isRead) Icons.Default.DoneAll else Icons.Default.Check,
+                                    contentDescription = "Status",
+                                    tint = if (message.isRead) TelegramCheckBlue else Color.White.copy(alpha = 0.75f),
+                                    modifier = Modifier.size(14.dp)
                                 )
                             }
                         }
@@ -836,7 +841,7 @@ fun ImageCollageView(
             )
     ) {
         androidx.compose.foundation.Image(
-            painter = painterResource(id = photoResId ?: R.drawable.app_logo),
+            painter = painterResource(id = photoResId ?: R.drawable.img_chat_wallpaper),
             contentDescription = "Media Collage",
             modifier = Modifier.matchParentSize(),
             contentScale = ContentScale.Crop
@@ -937,10 +942,11 @@ private fun LocationBubble(
                     Text(text = message.time, color = TelegramTextSecondary, fontSize = 11.sp)
                     if (message.isOutgoing) {
                         Spacer(modifier = Modifier.width(3.dp))
-                        MessageStatusIndicator(
-                            message = message,
-                            overrideColor = TelegramCheckBlue,
-                            size = 13.dp
+                        Icon(
+                            imageVector = if (message.isRead) Icons.Default.DoneAll else Icons.Default.Check,
+                            contentDescription = null,
+                            tint = TelegramCheckBlue,
+                            modifier = Modifier.size(13.dp)
                         )
                     }
                 }
@@ -1147,10 +1153,11 @@ private fun FileBubble(
                     Text(text = message.time, color = TelegramTextSecondary, fontSize = 11.sp)
                     if (message.isOutgoing) {
                         Spacer(modifier = Modifier.width(3.dp))
-                        MessageStatusIndicator(
-                            message = message,
-                            overrideColor = TelegramCheckBlue,
-                            size = 13.dp
+                        Icon(
+                            imageVector = if (message.isRead) Icons.Default.DoneAll else Icons.Default.Check,
+                            contentDescription = null,
+                            tint = TelegramCheckBlue,
+                            modifier = Modifier.size(13.dp)
                         )
                     }
                 }
@@ -1158,108 +1165,3 @@ private fun FileBubble(
         }
     }
 }
-
-@Composable
-fun MessageStatusIndicator(
-    message: MessageItem,
-    modifier: Modifier = Modifier,
-    overrideColor: Color? = null,
-    size: androidx.compose.ui.unit.Dp = 13.dp
-) {
-    if (!message.isOutgoing) return
-    if (message.isPending) {
-        Icon(
-            imageVector = Icons.Default.Schedule,
-            contentDescription = "Sending...",
-            tint = overrideColor ?: Color.White.copy(alpha = 0.75f),
-            modifier = modifier.size(size)
-        )
-    } else {
-        Icon(
-            imageVector = if (message.isRead) Icons.Default.DoneAll else Icons.Default.Check,
-            contentDescription = if (message.isRead) "Read" else "Sent",
-            tint = if (message.isRead) TelegramCheckBlue else (overrideColor ?: Color.White.copy(alpha = 0.85f)),
-            modifier = modifier.size(size)
-        )
-    }
-}
-
-@Composable
-fun TelegramQuickReactionPopup(
-    visible: Boolean,
-    onSelectReaction: (String) -> Unit,
-    onDismiss: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    if (!visible) return
-    val reactions = listOf("👍", "❤️", "🔥", "😂", "👏", "⚡", "🎉")
-    Box(
-        modifier = modifier
-            .shadow(12.dp, RoundedCornerShape(20.dp))
-            .clip(RoundedCornerShape(20.dp))
-            .background(Color(0xE61E2C3A))
-            .border(0.8.dp, TelegramGlassBorder, RoundedCornerShape(20.dp))
-            .padding(horizontal = 8.dp, vertical = 4.dp)
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            reactions.forEach { emoji ->
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .clickable { onSelectReaction(emoji) },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(text = emoji, fontSize = 18.sp)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun TelegramAudioWaveform(
-    progress: Float,
-    isPlaying: Boolean,
-    seed: Int,
-    playedColor: Color,
-    unplayedColor: Color,
-    onSeek: (Float) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val barCount = 36
-    val heights = remember(seed) {
-        val rand = java.util.Random(seed.toLong())
-        List(barCount) { 4.dp + (rand.nextFloat() * 16f).dp }
-    }
-
-    Row(
-        modifier = modifier
-            .height(26.dp)
-            .pointerInput(Unit) {
-                detectTapGestures { offset ->
-                    val ratio = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
-                    onSeek(ratio)
-                }
-            },
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(2.dp)
-    ) {
-        heights.forEachIndexed { index, barHeight ->
-            val barRatio = (index + 1).toFloat() / barCount
-            val isPlayed = barRatio <= progress
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(barHeight)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(if (isPlayed) playedColor else unplayedColor)
-            )
-        }
-    }
-}
-
-

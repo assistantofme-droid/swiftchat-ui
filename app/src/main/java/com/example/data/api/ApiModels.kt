@@ -275,6 +275,22 @@ data class ApiAudioMetadata(
 )
 
 @JsonClass(generateAdapter = true)
+data class ApiInlineKeyboardButton(
+    @Json(name = "text") val text: String? = null,
+    @Json(name = "url") val url: String? = null,
+    @Json(name = "callback_data") val callbackData: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class ApiAudioMetadata(
+    @Json(name = "title") val title: String? = null,
+    @Json(name = "artist") val artist: String? = null,
+    @Json(name = "coverUrl") val coverUrl: String? = null,
+    @Json(name = "duration") val duration: Int? = null,
+    @Json(name = "waveform") val waveform: List<Int>? = null
+)
+
+@JsonClass(generateAdapter = true)
 data class ApiMessage(
     @Json(name = "_id") val _id: String,
     @Json(name = "conversationId") val conversationId: String? = null,
@@ -305,7 +321,10 @@ data class ApiMessage(
     @Json(name = "isEdited") val isEdited: Boolean? = false,
     @Json(name = "editedAt") val editedAt: String? = null,
     @Json(name = "createdAt") val createdAt: String? = null,
-    @Json(name = "updatedAt") val updatedAt: String? = null
+    @Json(name = "updatedAt") val updatedAt: String? = null,
+    @Json(name = "replyMarkup") val replyMarkup: Any? = null,
+    @Json(name = "status") val status: String? = "sent",
+    @Json(name = "linkPreview") val linkPreview: Any? = null
 )
 
 @JsonClass(generateAdapter = true)

@@ -15,6 +15,7 @@ import com.example.data.api.ApiPollOption
 import com.example.data.api.ApiProfileSong
 import com.example.data.api.ApiSession
 import com.example.data.api.ApiUser
+import com.example.data.api.ApiAd
 import com.example.data.api.AddContactRequest
 import com.example.data.api.EditMessageRequest
 import com.example.data.api.ForwardMessageRequest
@@ -32,6 +33,7 @@ import com.example.data.model.GifItem
 import com.example.data.model.MediaPickerItem
 import com.example.data.model.MessageItem
 import com.example.data.model.MessageType
+import com.example.data.model.InlineKeyboardButton
 import com.example.data.model.ReactionItem
 import com.example.data.model.StickerItem
 import com.example.ui.components.UserProfileData
@@ -66,7 +68,7 @@ data class ChatUiState(
     val selectedChatId: String? = null,
     val currentMessages: List<MessageItem> = emptyList(),
     val isAttachmentSheetOpen: Boolean = false,
-    val selectedCategoryTab: Int = 0,
+    val selectedCategoryTab: String = "All Chats",
     val selectedBottomNavIndex: Int = 0,
     val isSearching: Boolean = false,
     val searchQuery: String = "",
@@ -141,7 +143,16 @@ data class ChatUiState(
     // Devices screen — sessions list
     val sessions: List<ApiSession> = emptyList(),
     val isSessionsLoading: Boolean = false,
-    val sessionsError: String? = null
+    val sessionsError: String? = null,
+
+    // Ads — fetched from GET /ads/public, displayed as pinned chat items
+    val ads: List<ApiAd> = emptyList(),
+
+    // In-app notification — fetched from GET /auth/startup-config
+    // Dismissable: once dismissed, won't reappear until a new one arrives
+    val notificationText: String? = null,
+    val notificationId: String? = null,
+    val dismissedNotificationId: String? = null
 )
 
 class ChatViewModel(application: Application) : AndroidViewModel(application) {
@@ -190,11 +201,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         loadStickersAndGifs()
 
         if (loggedIn) {
-            // Refresh current user profile from /auth/me to keep local session in sync
             bootstrapCurrentUser()
             refreshConversations()
             startConversationsPolling()
         }
+
+        // Load ads + startup config (notifications) on app start
+        loadAds()
+        loadStartupConfig()
     }
 
     // =============================================================
@@ -745,93 +759,21 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 } catch (_: Exception) {}
 
                 val mappedChats = conversations.distinctBy { it._id }.map { mapApiConversationToChatItem(it) }
-                val isPersian = _uiState.value.language == "fa"
-                val defaultChats = listOf(
-                    ChatItem(
-                        id = "saved_messages",
-                        title = if (isPersian) "پیام‌های ذخیره شده" else "Saved Messages",
-                        subtitle = if (isPersian) "فضای ابری برای ذخیره یادداشت‌ها و فایل‌ها" else "Your cloud storage",
-                        time = "12:00",
-                        unreadCount = 0,
-                        isOnline = true,
-                        isGroup = false,
-                        isChannel = false
-                    ),
-                    ChatItem(
-                        id = "channel_7eve9",
-                        title = "7eve9 Official Channel",
-                        subtitle = if (isPersian) "به 7eve9Chat خوش آمدید! جدیدترین قابلیت‌ها" else "Welcome to 7eve9Chat! Stay tuned for updates",
-                        time = "11:45",
-                        unreadCount = 1,
-                        isOnline = true,
-                        isGroup = false,
-                        isChannel = true
-                    ),
-                    ChatItem(
-                        id = "group_community",
-                        title = if (isPersian) "گروه عمومی کاربران" else "7eve9 Community",
-                        subtitle = if (isPersian) "گروه گفتگو و تبادل نظر کاربران" else "Official user discussion group",
-                        time = "10:30",
-                        unreadCount = 0,
-                        isOnline = true,
-                        isGroup = true,
-                        isChannel = false
-                    )
-                )
 
                 _uiState.update { state ->
-                    val combinedChats = if (mappedChats.isNotEmpty()) {
-                        val localDefaults = defaultChats.filter { d -> mappedChats.none { it.id == d.id } }
-                        mappedChats + localDefaults
-                    } else {
-                        defaultChats
-                    }
                     state.copy(
-                        chats = combinedChats,
+                        chats = mappedChats,
                         isRefreshing = false,
                         networkBannerMessage = null
                     )
                 }
             } catch (e: Exception) {
                 Log.e("ChatViewModel", "refreshConversations error", e)
-                val isPersian = _uiState.value.language == "fa"
-                val defaultChats = listOf(
-                    ChatItem(
-                        id = "saved_messages",
-                        title = if (isPersian) "پیام‌های ذخیره شده" else "Saved Messages",
-                        subtitle = if (isPersian) "فضای ابری برای ذخیره پیام‌ها" else "Your cloud storage",
-                        time = "12:00",
-                        unreadCount = 0,
-                        isOnline = true,
-                        isGroup = false,
-                        isChannel = false
-                    ),
-                    ChatItem(
-                        id = "channel_7eve9",
-                        title = "7eve9 Official Channel",
-                        subtitle = if (isPersian) "کانال رسمی 7eve9Chat" else "Welcome to 7eve9Chat!",
-                        time = "11:45",
-                        unreadCount = 1,
-                        isOnline = true,
-                        isGroup = false,
-                        isChannel = true
-                    ),
-                    ChatItem(
-                        id = "group_community",
-                        title = if (isPersian) "گروه عمومی کاربران" else "7eve9 Community",
-                        subtitle = if (isPersian) "گروه گفتگو و تبادل نظر کاربران" else "Official discussion group",
-                        time = "10:30",
-                        unreadCount = 0,
-                        isOnline = true,
-                        isGroup = true,
-                        isChannel = false
-                    )
-                )
                 _uiState.update { state ->
                     state.copy(
-                        chats = if (state.chats.isEmpty()) defaultChats else state.chats,
                         isRefreshing = false,
-                        networkBannerMessage = null
+                        networkBannerMessage = if (state.chats.isEmpty())
+                            "Network error: ${e.localizedMessage ?: "check connection"}" else null
                     )
                 }
             }
@@ -1046,12 +988,39 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             ReactionItem(emoji = it.emoji, userAvatarType = AvatarType.MOTORCYCLE)
         } ?: emptyList()
 
-        // Determine read state: outgoing messages are "read" if any readBy entry isn't the sender;
-        // incoming messages are always considered read once displayed.
         val isRead = when {
             apiMsg.readBy.isNullOrEmpty() -> false
             isOutgoing -> apiMsg.readBy!!.any { it != currentUserId }
             else -> true
+        }
+
+        // Extract inline keyboard from replyMarkup
+        val inlineKeyboard = extractInlineKeyboard(apiMsg.replyMarkup)
+
+        // Extract audio metadata
+        val audioTitle = apiMsg.audioMetadata?.title
+        val audioArtist = apiMsg.audioMetadata?.artist
+        val audioCoverUrl = ApiClient.resolveUrl(apiMsg.audioMetadata?.coverUrl)
+        val audioWaveform = apiMsg.audioMetadata?.waveform ?: emptyList()
+
+        // Reply info
+        val replyToText = when (val rt = apiMsg.replyTo) {
+            is ApiMessage -> rt.text
+            is Map<*, *> -> (rt["text"] ?: rt["fileName"] ?: rt["type"]) as? String
+            else -> null
+        }
+        val replyToSender = when (val rt = apiMsg.replyTo) {
+            is ApiMessage -> rt.sender?.name ?: rt.sender?.username
+            is Map<*, *> -> {
+                val s = rt["sender"]
+                when (s) {
+                    is ApiUser -> s.name ?: s.username
+                    is Map<*, *> -> (s["name"] ?: s["username"]) as? String
+                    is String -> s
+                    else -> null
+                }
+            }
+            else -> null
         }
 
         return MessageItem(
@@ -1067,8 +1036,52 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             senderName = if (!isOutgoing) apiMsg.sender?.name ?: apiMsg.sender?.username else null,
             senderAvatarUrl = ApiClient.resolveUrl(apiMsg.sender?.avatar),
             reactions = reactions,
-            isRead = isRead
+            isRead = isRead,
+            isBot = apiMsg.sender?.isBot == true,
+            inlineKeyboard = inlineKeyboard,
+            replyToText = replyToText,
+            replyToSender = replyToSender,
+            audioTitle = audioTitle,
+            audioArtist = audioArtist,
+            audioCoverUrl = audioCoverUrl,
+            audioWaveform = audioWaveform
         )
+    }
+
+    /** Extract inline keyboard buttons from the server's replyMarkup field. */
+    private fun extractInlineKeyboard(replyMarkup: Any?): List<List<InlineKeyboardButton>> {
+        if (replyMarkup == null) return emptyList()
+        return try {
+            when (replyMarkup) {
+                is Map<*, *> -> {
+                    val keyboard = replyMarkup["inline_keyboard"] ?: replyMarkup["keyboard"]
+                    when (keyboard) {
+                        is List<*> -> {
+                            keyboard.mapNotNull { row ->
+                                when (row) {
+                                    is List<*> -> row.mapNotNull { btn ->
+                                        when (btn) {
+                                            is Map<*, *> -> InlineKeyboardButton(
+                                                text = (btn["text"] ?: "") as String,
+                                                url = btn["url"] as? String,
+                                                callbackData = (btn["callback_data"] ?: btn["callbackData"]) as? String
+                                            )
+                                            else -> null
+                                        }
+                                    }.ifEmpty { null }
+                                    else -> null
+                                }
+                            }
+                        }
+                        else -> emptyList()
+                    }
+                }
+                else -> emptyList()
+            }
+        } catch (e: Exception) {
+            Log.w("ChatViewModel", "extractInlineKeyboard: ${e.message}")
+            emptyList()
+        }
     }
 
     fun sendMessage(text: String) {
@@ -1083,16 +1096,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             time = currentTime,
             isOutgoing = true,
             type = MessageType.TEXT,
-            isRead = false,
-            isPending = true
+            isRead = false
         )
 
-        // Optimistic UI update — immediately shows message with clock icon
+        // Optimistic UI update
         _uiState.update { state ->
             val updatedMessages = state.currentMessages + localMessage
             val updatedChats = state.chats.map { chat ->
                 if (chat.id == currentChatId) {
-                    chat.copy(subtitle = text.trim(), time = currentTime, hasSingleCheck = false)
+                    chat.copy(subtitle = text.trim(), time = currentTime, hasSingleCheck = true)
                 } else chat
             }
             state.copy(
@@ -1112,7 +1124,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 val response = ApiClient.service.sendMessage(req)
                 if (response.isSuccessful && response.body() != null) {
                     val serverMsg = response.body()!!
-                    val mapped = mapApiMessageToItem(serverMsg).copy(isPending = false, hasSingleCheck = true)
+                    val mapped = mapApiMessageToItem(serverMsg)
 
                     _uiState.update { state ->
                         val updated = state.currentMessages.map {
@@ -1121,30 +1133,21 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         state.copy(currentMessages = updated)
                     }
                 } else {
-                    // If backend endpoint is unavailable or local conversation, transition clock to checkmark
-                    delay(350)
+                    // Mark local message as failed (still show it, but update state)
+                    val err = parseErrorBody(response.errorBody())
+                    Log.e("ChatViewModel", "sendMessage failed: ${response.code()} $err")
                     _uiState.update { state ->
-                        val updated = state.currentMessages.map {
-                            if (it.id == tempId) it.copy(isPending = false, hasSingleCheck = true) else it
-                        }
-                        val updatedChats = state.chats.map { chat ->
-                            if (chat.id == currentChatId) chat.copy(hasSingleCheck = true) else chat
-                        }
-                        state.copy(currentMessages = updated, chats = updatedChats)
+                        state.copy(
+                            networkBannerMessage = "Failed to send message (${response.code()})"
+                        )
                     }
                 }
             } catch (e: Exception) {
                 Log.e("ChatViewModel", "sendMessage error", e)
-                // In offline / local fallback mode, ensure the message transitions from clock to checkmark
-                delay(350)
                 _uiState.update { state ->
-                    val updated = state.currentMessages.map {
-                        if (it.id == tempId) it.copy(isPending = false, hasSingleCheck = true) else it
-                    }
-                    val updatedChats = state.chats.map { chat ->
-                        if (chat.id == currentChatId) chat.copy(hasSingleCheck = true) else chat
-                    }
-                    state.copy(currentMessages = updated, chats = updatedChats)
+                    state.copy(
+                        networkBannerMessage = "Network error: ${e.localizedMessage ?: "message not sent"}"
+                    )
                 }
             }
         }
@@ -1511,7 +1514,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         duration: Int = 28,
         fileName: String = "Voice message"
     ) {
-        if (audioUrl.isBlank()) return  // Don't send mock audio
         val currentChatId = _uiState.value.selectedChatId ?: return
         val currentTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val localMessage = MessageItem(
@@ -1555,7 +1557,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         thumbUrl: String = "",
         caption: String? = null
     ) {
-        if (videoUrl.isBlank()) return  // Don't send mock video
         val currentChatId = _uiState.value.selectedChatId ?: return
         val currentTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val localMessage = MessageItem(
@@ -1901,20 +1902,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun selectCategoryTab(tab: Int) {
+    fun selectCategoryTab(tab: String) {
         _uiState.update { it.copy(selectedCategoryTab = tab) }
-    }
-
-    fun selectCategoryTab(tabName: String) {
-        val index = when (tabName.lowercase()) {
-            "all", "all chats" -> 0
-            "personal" -> 1
-            "groups" -> 2
-            "channels" -> 3
-            "bots" -> 4
-            else -> 0
-        }
-        selectCategoryTab(index)
     }
 
     fun selectBottomNavIndex(index: Int) {
@@ -2357,36 +2346,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 if (!resp.isSuccessful || resp.body() == null) {
                     val err = parseErrorBody(resp.errorBody())
                     Log.e("ChatViewModel", "openPrivateChatWithContact API failed: ${resp.code()} $err")
-                    // Fallback to local conversation so user can immediately open chat
-                    val contact = _uiState.value.contacts.find { it._id == userId || it.phone == userId }
-                    val title = contact?.name ?: contact?.username ?: contact?.phone ?: "User"
-                    val fallbackId = "chat_$userId"
-                    val fallbackItem = ChatItem(
-                        id = fallbackId,
-                        title = title,
-                        subtitle = "Online",
-                        time = "Just now",
-                        unreadCount = 0,
-                        avatarUrl = contact?.avatar,
-                        isOnline = true,
-                        isGroup = false,
-                        isChannel = false
-                    )
-                    _uiState.update { state ->
-                        state.copy(
-                            chats = if (state.chats.none { it.id == fallbackItem.id }) {
-                                listOf(fallbackItem) + state.chats
-                            } else state.chats,
-                            selectedBottomNavIndex = 0,
-                            selectedChatId = fallbackItem.id,
-                            currentMessages = emptyList()
-                        )
+                    _uiState.update {
+                        it.copy(networkBannerMessage = "Couldn't open chat: ${err ?: "code ${resp.code()}"}")
                     }
                     return@launch
                 }
 
                 val conv = resp.body()!!
-                Log.d("ChatViewModel", "openPrivateChatWithContact: got conversation ${conv._id} type=${conv.type}")
+                Log.d("ChatViewModel", "openPrivateChatWithContact: got conversation ${conv._id} type=${conv.type} participants=${conv.participants?.size}")
                 val chatItem = mapApiConversationToChatItem(conv)
 
                 // Single atomic state update: add chat + switch tab + select chat
@@ -2409,29 +2376,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 markConversationAsRead(chatItem.id)
             } catch (e: Exception) {
                 Log.e("ChatViewModel", "openPrivateChatWithContact error", e)
-                val contact = _uiState.value.contacts.find { it._id == userId || it.phone == userId }
-                val title = contact?.name ?: contact?.username ?: contact?.phone ?: "User"
-                val fallbackId = "chat_$userId"
-                val fallbackItem = ChatItem(
-                    id = fallbackId,
-                    title = title,
-                    subtitle = "Online",
-                    time = "Just now",
-                    unreadCount = 0,
-                    avatarUrl = contact?.avatar,
-                    isOnline = true,
-                    isGroup = false,
-                    isChannel = false
-                )
-                _uiState.update { state ->
-                    state.copy(
-                        chats = if (state.chats.none { it.id == fallbackItem.id }) {
-                            listOf(fallbackItem) + state.chats
-                        } else state.chats,
-                        selectedBottomNavIndex = 0,
-                        selectedChatId = fallbackItem.id,
-                        currentMessages = emptyList()
-                    )
+                _uiState.update {
+                    it.copy(networkBannerMessage = "Network error: ${e.localizedMessage}")
                 }
             }
         }
@@ -2507,6 +2453,90 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // =============================================================
+
+    // =============================================================
+    // Ads — GET /ads/public, displayed as pinned chat items
+    // =============================================================
+
+    fun loadAds() {
+        viewModelScope.launch {
+            try {
+                val resp = ApiClient.service.getPublicAds()
+                if (resp.isSuccessful && resp.body() != null) {
+                    _uiState.update { it.copy(ads = resp.body()!!) }
+                }
+            } catch (e: Exception) {
+                Log.w("ChatViewModel", "loadAds: ${e.message}")
+            }
+        }
+    }
+
+    private fun loadStartupConfig() {
+        viewModelScope.launch {
+            try {
+                val resp = ApiClient.service.getStartupConfig()
+                if (resp.isSuccessful) {
+                    val config = resp.body()
+                    when (config) {
+                        is Map<*, *> -> {
+                            val text = config["text"] as? String
+                            val id = config["id"] as? String ?: config["_id"] as? String
+                            if (!text.isNullOrBlank() && id != null && id != sessionManager.dismissedNotificationId) {
+                                _uiState.update {
+                                    it.copy(notificationText = text, notificationId = id)
+                                }
+                            }
+                        }
+                        is String -> {
+                            if (config.isNotBlank() && config != sessionManager.dismissedNotificationId) {
+                                _uiState.update {
+                                    it.copy(notificationText = config, notificationId = config)
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("ChatViewModel", "loadStartupConfig: " + e.message)
+            }
+        }
+    }
+
+    /** Dismiss the current in-app notification so it won't show again. */
+    fun dismissNotification() {
+        val currentId = _uiState.value.notificationId
+        if (currentId != null) {
+            sessionManager.dismissedNotificationId = currentId
+            _uiState.update {
+                it.copy(
+                    notificationText = null,
+                    notificationId = null,
+                    dismissedNotificationId = currentId
+                )
+            }
+        }
+    }
+
+    // =============================================================
+    // Bot — callback query for inline keyboard buttons
+    // =============================================================
+
+    /** Handle a tap on a bot's inline keyboard button. */
+    fun handleBotCallback(conversationId: String, messageId: String, callbackData: String) {
+        viewModelScope.launch {
+            try {
+                ApiClient.service.sendCallbackQuery(
+                    mapOf(
+                        "conversationId" to conversationId,
+                        "messageId" to messageId,
+                        "callbackData" to callbackData
+                    )
+                )
+            } catch (e: Exception) {
+                Log.w("ChatViewModel", "handleBotCallback: ${e.message}")
+            }
+        }
+    }
     // Helpers
     // =============================================================
 

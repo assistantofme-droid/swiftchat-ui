@@ -156,6 +156,9 @@ class SessionManager(context: Context) {
         get() = prefs.getString(KEY_PRIVACY_GROUPS, "Everyone") ?: "Everyone"
         set(value) = prefs.edit().putString(KEY_PRIVACY_GROUPS, value).apply()
 
+    var dismissedNotificationId: String?
+        get() = prefs.getString("dismissed_notification_id", null)
+        set(value) = prefs.edit().putString("dismissed_notification_id", value).apply()
     var isPhoneHidden: Boolean
         get() = prefs.getBoolean(KEY_IS_PHONE_HIDDEN, false)
         set(value) = prefs.edit().putBoolean(KEY_IS_PHONE_HIDDEN, value).apply()
